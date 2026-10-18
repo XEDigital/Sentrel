@@ -4,6 +4,16 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
+## [0.9.8] - 2026-10-18
+
+### Fixed
+
+- Windows agent install in self-signed TLS mode failed when run unattended (as SYSTEM from a scheduled task, GPO or remote management tool) with "There is no Runspace available to run scripts in this thread". The certificate pin check was a PowerShell script block, which .NET can call on a thread without a runspace. Both the generated install command and `install-agent.ps1` now use a compiled .NET class for the check (same SPKI pin, same behaviour), on Windows PowerShell 5.1 and PowerShell 7. Interactive installs were not affected.
+
+### Removed
+
+- `install-agent.ps1 -InsecureDownload`. It had not been generated since self-signed installs switched to certificate pinning, and now stops with an error pointing to `-PinSha256`.
+
 ## [0.9.7] - 2026-10-15
 
 ### Fixed

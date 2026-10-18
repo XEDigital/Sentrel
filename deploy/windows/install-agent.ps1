@@ -15,7 +15,7 @@
 .PARAMETER ReadOnly      Shorthand for -WriteJobs none.
 .PARAMETER OperatorKey   Operator public key(s) (from "sentrel-sign keygen-operator") for -WriteJobs operator.
 .PARAMETER PinSha256     Self-signed TLS mode: accept only a server certificate whose public key (SPKI) hashes to this base64 SHA-256.
-.PARAMETER InsecureDownload Deprecated, not generated any more: skip TLS validation for the binary download only.
+.PARAMETER InsecureDownload Removed; use -PinSha256. Kept only to print a clear error for old scripts.
 .PARAMETER Uninstall     Remove the agent.
 #>
 param(
@@ -77,39 +77,34 @@ if ($BinaryPath) {
   Say "downloading agent from $url"
   $tmp = "$Exe.download"
   if ($PinSha256) {
-    # Verify the server certificate by the hash of its public key (SPKI),
-    # not by a CA. The callback is restored afterwards.
-    $pin = $PinSha256
-    $check = {
-      param($s, $c, $ch, $e)
-      $spki = [byte[]](0x30,0x59,0x30,0x13,0x06,0x07,0x2a,0x86,0x48,0xce,0x3d,0x02,0x01,0x06,0x08,0x2a,0x86,0x48,0xce,0x3d,0x03,0x01,0x07,0x03,0x42,0x00) + $c.GetPublicKey()
-      [Convert]::ToBase64String([Security.Cryptography.SHA256]::Create().ComputeHash($spki)) -eq $pin
-    }
+    # Verify the server certificate by the hash of its public key (SPKI), not
+    # by a CA. The check is compiled C#, not a script block: .NET may call it
+    # on a thread with no PowerShell runspace (for example when this runs
+    # unattended as SYSTEM), where a script block cannot run. SentrelPin is the
+    # same class the generated install command defines; keep them identical.
     if ($PSVersionTable.PSVersion.Major -ge 6) {
-      $handler = New-Object System.Net.Http.HttpClientHandler
-      $handler.ServerCertificateCustomValidationCallback = [System.Func[System.Net.Http.HttpRequestMessage, System.Security.Cryptography.X509Certificates.X509Certificate2, System.Security.Cryptography.X509Certificates.X509Chain, System.Net.Security.SslPolicyErrors, bool]]{
-        param($m, $c, $ch, $e) & $check $null $c $ch $e
+      # PowerShell 7: ServicePointManager does not affect HttpClient, so pin
+      # through the handler. Its own copy of the check, because separately
+      # compiled Add-Type classes cannot reference each other.
+      if (-not ('SentrelPinHttp' -as [type])) {
+        Add-Type -TypeDefinition 'using System;using System.Net.Http;using System.Security.Cryptography;using System.Security.Cryptography.X509Certificates;public static class SentrelPinHttp{static readonly byte[] H={0x30,0x59,0x30,0x13,0x06,0x07,0x2a,0x86,0x48,0xce,0x3d,0x02,0x01,0x06,0x08,0x2a,0x86,0x48,0xce,0x3d,0x03,0x01,0x07,0x03,0x42,0x00};static bool Match(X509Certificate c,string pin){if(c==null||pin==null)return false;byte[] k=c.GetPublicKey();byte[] b=new byte[H.Length+k.Length];Buffer.BlockCopy(H,0,b,0,H.Length);Buffer.BlockCopy(k,0,b,H.Length,k.Length);using(var h=SHA256.Create())return Convert.ToBase64String(h.ComputeHash(b))==pin;}public static HttpClient Client(string pin){var h=new HttpClientHandler();h.ServerCertificateCustomValidationCallback=(m,c,ch,e)=>Match(c,pin);return new HttpClient(h);}}'
       }
-      $client = New-Object System.Net.Http.HttpClient($handler)
+      $client = [SentrelPinHttp]::Client($PinSha256)
       try {
         $bytes = $client.GetByteArrayAsync($url).GetAwaiter().GetResult()
         [IO.File]::WriteAllBytes($tmp, $bytes)
       } finally { $client.Dispose() }
     } else {
-      $prev = [Net.ServicePointManager]::ServerCertificateValidationCallback
-      [Net.ServicePointManager]::ServerCertificateValidationCallback = $check
+      if (-not ('SentrelPin' -as [type])) {
+        Add-Type -TypeDefinition 'using System;using System.Net;using System.Net.Security;using System.Security.Cryptography;using System.Security.Cryptography.X509Certificates;public static class SentrelPin{public static string Pin;static readonly byte[] H={0x30,0x59,0x30,0x13,0x06,0x07,0x2a,0x86,0x48,0xce,0x3d,0x02,0x01,0x06,0x08,0x2a,0x86,0x48,0xce,0x3d,0x03,0x01,0x07,0x03,0x42,0x00};public static bool Check(object s,X509Certificate c,X509Chain ch,SslPolicyErrors e){if(c==null||Pin==null)return false;byte[] k=c.GetPublicKey();byte[] b=new byte[H.Length+k.Length];Buffer.BlockCopy(H,0,b,0,H.Length);Buffer.BlockCopy(k,0,b,H.Length,k.Length);using(var h=SHA256.Create())return Convert.ToBase64String(h.ComputeHash(b))==Pin;}public static void On(){ServicePointManager.ServerCertificateValidationCallback=Check;}public static void Off(){ServicePointManager.ServerCertificateValidationCallback=null;}}'
+      }
+      [SentrelPin]::Pin = $PinSha256
+      [SentrelPin]::On()
       try { (New-Object Net.WebClient).DownloadFile($url, $tmp) }
-      finally { [Net.ServicePointManager]::ServerCertificateValidationCallback = $prev }
+      finally { [SentrelPin]::Off() }
     }
   } elseif ($InsecureDownload) {
-    if ($PSVersionTable.PSVersion.Major -ge 6) {
-      Invoke-WebRequest -Uri $url -OutFile $tmp -SkipCertificateCheck -UseBasicParsing
-    } else {
-      $prev = [Net.ServicePointManager]::ServerCertificateValidationCallback
-      [Net.ServicePointManager]::ServerCertificateValidationCallback = { $true }
-      try { (New-Object Net.WebClient).DownloadFile($url, $tmp) }
-      finally { [Net.ServicePointManager]::ServerCertificateValidationCallback = $prev }
-    }
+    throw "-InsecureDownload is no longer supported. Copy a current install command from the Agents page: in self-signed mode it pins the server certificate with -PinSha256."
   } else {
     Invoke-WebRequest -Uri $url -OutFile $tmp -UseBasicParsing
   }

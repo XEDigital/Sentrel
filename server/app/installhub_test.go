@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"sentrel/deploy"
 	"strings"
 	"testing"
 )
@@ -108,6 +109,15 @@ func TestInstallInfoPerTLSMode(t *testing.T) {
 		strings.Contains(cmds["windows"], "{$true}") {
 		t.Fatalf("selfsigned commands: %v", cmds)
 	}
+	// The Windows pin check is compiled C#, never a PowerShell script block:
+	// .NET may run the callback on a thread with no runspace, which fails when
+	// the command runs unattended (as SYSTEM).
+	win := cmds["windows"]
+	if strings.Contains(win, "ServerCertificateValidationCallback={") || strings.Contains(win, "param($s") ||
+		!strings.Contains(win, "Add-Type -TypeDefinition") || !strings.Contains(win, "[SentrelPin]::On()") ||
+		!strings.Contains(win, "$p='"+want+"'") || !strings.Contains(win, "-as [type]") {
+		t.Fatalf("windows command does not use the compiled pin check: %s", win)
+	}
 
 	// Needs the hosts permission: unauthenticated callers are refused.
 	if code, _, _ := e.client().do("GET", "/agents/install-info", nil); code != 401 {
@@ -175,5 +185,18 @@ func TestPushInstallRoutesRemoved(t *testing.T) {
 	_ = e.a.db.Get(&n, `SELECT COUNT(*) FROM sqlite_master WHERE name='push_installs'`)
 	if n != 0 {
 		t.Fatal("push_installs table still exists after migrations")
+	}
+}
+
+// The generated Windows command and install-agent.ps1 must define the same
+// SentrelPin class: whichever runs first in a PowerShell session is the one
+// used, because the second is skipped by the -as [type] guard.
+func TestWindowsPinClassMatchesInstaller(t *testing.T) {
+	ps := string(deploy.AgentPowerShell)
+	if !strings.Contains(ps, "Add-Type -TypeDefinition '"+psPinType+"'") {
+		t.Fatal("install-agent.ps1 does not define the same SentrelPin class as the generated command")
+	}
+	if strings.Contains(ps, "ServerCertificateValidationCallback = $") || strings.Contains(ps, "param($s, $c, $ch, $e)") {
+		t.Fatal("install-agent.ps1 uses a script block as a certificate callback")
 	}
 }

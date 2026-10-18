@@ -49,15 +49,26 @@ func (a *App) createToken(ctx context.Context, p *Principal, tenant int64, group
 	return &et, tok, err
 }
 
-// psPinCallback is the PowerShell validation callback that accepts only a server
-// certificate whose SubjectPublicKeyInfo hashes to $p (base64 SHA-256). The
-// self-signed server certificate is ECDSA P-256, so the SPKI is the fixed
-// algorithm header followed by the raw public key point.
-const psPinCallback = `[Net.ServicePointManager]::ServerCertificateValidationCallback={param($s,$c,$ch,$e) [Convert]::ToBase64String([Security.Cryptography.SHA256]::Create().ComputeHash([byte[]](0x30,0x59,0x30,0x13,0x06,0x07,0x2a,0x86,0x48,0xce,0x3d,0x02,0x01,0x06,0x08,0x2a,0x86,0x48,0xce,0x3d,0x03,0x01,0x07,0x03,0x42,0x00)+$c.GetPublicKey())) -eq $p}`
+// psPinType is a compiled C# class whose Check method accepts only a server
+// certificate whose SubjectPublicKeyInfo hashes to SentrelPin.Pin (base64
+// SHA-256). The self-signed server certificate is ECDSA P-256, so the SPKI is
+// the fixed algorithm header followed by the raw public key point.
+//
+// It must be compiled code, not a PowerShell script block: .NET may run the
+// validation callback on a thread with no PowerShell runspace, where a script
+// block cannot run. That happens when the command runs unattended (as SYSTEM
+// from a scheduled task, GPO or RMM tool), so the pinned download failed there.
+// deploy/windows/install-agent.ps1 defines the identical class; keep the two
+// in step, because whichever runs first in a session wins.
+const psPinType = `using System;using System.Net;using System.Net.Security;using System.Security.Cryptography;using System.Security.Cryptography.X509Certificates;public static class SentrelPin{public static string Pin;static readonly byte[] H={0x30,0x59,0x30,0x13,0x06,0x07,0x2a,0x86,0x48,0xce,0x3d,0x02,0x01,0x06,0x08,0x2a,0x86,0x48,0xce,0x3d,0x03,0x01,0x07,0x03,0x42,0x00};public static bool Check(object s,X509Certificate c,X509Chain ch,SslPolicyErrors e){if(c==null||Pin==null)return false;byte[] k=c.GetPublicKey();byte[] b=new byte[H.Length+k.Length];Buffer.BlockCopy(H,0,b,0,H.Length);Buffer.BlockCopy(k,0,b,H.Length,k.Length);using(var h=SHA256.Create())return Convert.ToBase64String(h.ComputeHash(b))==Pin;}public static void On(){ServicePointManager.ServerCertificateValidationCallback=Check;}public static void Off(){ServicePointManager.ServerCertificateValidationCallback=null;}}`
+
+// psPinCallback installs the pin check for $p. The -as [type] guard lets the
+// command run twice in one PowerShell session without "type already exists".
+const psPinCallback = `if(-not('SentrelPin' -as [type])){Add-Type -TypeDefinition '` + psPinType + `'}; [SentrelPin]::Pin=$p; [SentrelPin]::On()`
 
 // installCommands builds copy-paste install commands for a token. In
 // self-signed mode the one-liners fetch the installer with the server
-// certificate pinned (curl --pinnedpubkey; a PowerShell validation callback)
+// certificate pinned (curl --pinnedpubkey; a compiled .NET validation callback)
 // and pass the same pin on so the installer's own downloads are pinned too.
 func (a *App) installCommands(serverURL, token string) (cmds map[string]string, caFingerprint, spki string) {
 	selfSigned := strings.HasPrefix(serverURL, "https://") && a.srv.Mode() == "selfsigned"

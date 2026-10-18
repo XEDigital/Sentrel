@@ -34,7 +34,7 @@ Add `--ca-fingerprint FP` (`CAFINGERPRINT=FP` for the MSI) in self-signed mode, 
 
 ### Self-signed certificates: pinning
 
-In `selfsigned` TLS mode the generated commands never disable certificate checks. The installer is fetched with `curl -fsSL -k --pinnedpubkey "sha256//<spki>"`, where `<spki>` is the base64 SHA-256 of the server certificate's public key, and the same pin is passed on as `--pin-sha256` (`-PinSha256` on Windows) so the binary download is pinned too. `--ca-fingerprint` then pins the CA at registration. The pin changes when the server certificate is regenerated (name change, or less than 30 days left); copy a fresh command from the Agents page. `wget` cannot pin a key, so `--pin-sha256` requires `curl`. The `--insecure-download` / `-InsecureDownload` options remain for old scripts but are no longer generated.
+In `selfsigned` TLS mode the generated commands never disable certificate checks. The installer is fetched with `curl -fsSL -k --pinnedpubkey "sha256//<spki>"`, where `<spki>` is the base64 SHA-256 of the server certificate's public key, and the same pin is passed on as `--pin-sha256` (`-PinSha256` on Windows) so the binary download is pinned too. `--ca-fingerprint` then pins the CA at registration. The pin changes when the server certificate is regenerated (name change, or less than 30 days left); copy a fresh command from the Agents page. `wget` cannot pin a key, so `--pin-sha256` requires `curl`. On Windows the pin is checked by a small compiled .NET class (`SentrelPin`) rather than a PowerShell script block, so the command also works unattended, for example as SYSTEM from a scheduled task, GPO or remote management tool. The Linux `--insecure-download` option remains for old scripts but is no longer generated; Windows `-InsecureDownload` was removed and now stops with an error pointing to `-PinSha256`.
 
 ### Linux
 
@@ -65,7 +65,7 @@ From an elevated PowerShell:
 & ([scriptblock]::Create((irm https://monitor.example.com/install/agent.ps1))) -Server https://monitor.example.com -Token ABCD-1234-EFGH
 ```
 
-Parameters: `-Server`, `-Token`, `-CaFingerprint`, `-BinaryPath`, `-Name`, `-WriteJobs`, `-ReadOnly`, `-OperatorKey`, `-PinSha256`, `-InsecureDownload` (deprecated), `-Uninstall`. The script installs to `C:\Program Files\Sentrel Agent\sentrel-agent.exe`, keeps config and keys in `C:\ProgramData\Sentrel Agent` (restricted to SYSTEM and Administrators), registers the `SentrelAgent` service (automatic delayed start, restart on failure) and starts it.
+Parameters: `-Server`, `-Token`, `-CaFingerprint`, `-BinaryPath`, `-Name`, `-WriteJobs`, `-ReadOnly`, `-OperatorKey`, `-PinSha256`, `-Uninstall`. The script installs to `C:\Program Files\Sentrel Agent\sentrel-agent.exe`, keeps config and keys in `C:\ProgramData\Sentrel Agent` (restricted to SYSTEM and Administrators), registers the `SentrelAgent` service (automatic delayed start, restart on failure) and starts it.
 
 For fleet deployment an MSI is built (`msiexec /i sentrel-agent-<version>-x64.msi SERVER=https://monitor.example.com TOKEN=ABCD-1234-EFGH /qn`). `scripts/build.sh` builds it from `deploy/windows/agent.wxs` when `wixl` (msitools) is installed; otherwise the release has no MSI. Optional properties: `CAFINGERPRINT`, `NAME`, `WRITEJOBS=server|operator|none` and `OPERATORKEY=<key>[,<key>...]`.
 
