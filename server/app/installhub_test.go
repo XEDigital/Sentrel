@@ -99,6 +99,11 @@ func TestInstallInfoPerTLSMode(t *testing.T) {
 	if m["tls_mode"] != "selfsigned" || m["spki_sha256"] != want || want == "" || !strings.HasPrefix(m["ca_fingerprint"].(string), "sha256:") {
 		t.Fatalf("selfsigned mode: %v", m)
 	}
+	// The Agents page builds the Windows command from this; it must be the
+	// compiled check, never a script block.
+	if pc, _ := m["ps_pin_check"].(string); pc != psPinCallback || !strings.Contains(pc, "Add-Type -TypeDefinition") || strings.Contains(pc, "ServerCertificateValidationCallback={") {
+		t.Fatalf("install-info ps_pin_check: %q", m["ps_pin_check"])
+	}
 	_ = cert
 
 	// The generated one-liners pin the certificate and never use --insecure-download.

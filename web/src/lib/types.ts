@@ -592,6 +592,8 @@ export interface InstallInfo {
   ca_fingerprint: string
   /** Base64 SHA-256 of the server certificate's SPKI (self-signed mode only). */
   spki_sha256: string
+  /** PowerShell that installs the certificate pin check for $p (self-signed mode only). */
+  ps_pin_check?: string
   packages: InstallPackage[]
 }
 

@@ -4,6 +4,12 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
+## [0.9.9] - 2026-10-18
+
+### Fixed
+
+- The Windows install command shown on the Agents page still used the old script-block certificate check in self-signed TLS mode, because the page built the command itself from its own copy. Depending on the machine, it failed even when pasted into an Administrator PowerShell window, with "The underlying connection was closed: An unexpected error occurred on a send". The page now takes the compiled pin check from the server (`ps_pin_check` in `GET /agents/install-info`), so the command it shows matches the 0.9.8 fix and there is one definition of the check.
+
 ## [0.9.8] - 2026-10-18
 
 ### Fixed

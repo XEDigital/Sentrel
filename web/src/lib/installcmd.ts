@@ -5,7 +5,7 @@ export type Platform = 'deb' | 'rpm' | 'script' | 'windows'
 export type Arch = 'amd64' | 'arm64'
 
 export interface CmdOptions {
-  info: Pick<InstallInfo, 'server_url' | 'tls_mode' | 'ca_fingerprint' | 'spki_sha256'>
+  info: Pick<InstallInfo, 'server_url' | 'tls_mode' | 'ca_fingerprint' | 'spki_sha256' | 'ps_pin_check'>
   token: string
   policy: WritePolicy
   operatorKeys: string[]
@@ -26,12 +26,6 @@ export function parseOperatorKeys(s: string): { keys: string[]; invalid: boolean
 /** Pinning applies to a self-signed certificate whose public key hash is known. */
 export const pinOf = (i: CmdOptions['info']) => (i.tls_mode === 'selfsigned' && i.spki_sha256 ? i.spki_sha256 : '')
 const caOf = (i: CmdOptions['info']) => (i.tls_mode === 'selfsigned' ? i.ca_fingerprint : '')
-
-// PowerShell validation callback: accepts only a server certificate whose
-// SubjectPublicKeyInfo hashes to $p. The self-signed certificate is ECDSA
-// P-256, so the SPKI is the fixed algorithm header plus the raw key point.
-export const PS_PIN_CALLBACK =
-  '[Net.ServicePointManager]::ServerCertificateValidationCallback={param($s,$c,$ch,$e) [Convert]::ToBase64String([Security.Cryptography.SHA256]::Create().ComputeHash([byte[]](0x30,0x59,0x30,0x13,0x06,0x07,0x2a,0x86,0x48,0xce,0x3d,0x02,0x01,0x06,0x08,0x2a,0x86,0x48,0xce,0x3d,0x03,0x01,0x07,0x03,0x42,0x00)+$c.GetPublicKey())) -eq $p}'
 
 function curlFlags(o: CmdOptions): string {
   const pin = pinOf(o.info)
@@ -69,7 +63,11 @@ export function windowsCommand(o: CmdOptions): string {
   if (ca) args.push(`-CaFingerprint ${ca}`)
   if (pin) args.push(`-PinSha256 ${pin}`)
   args.push(...policyArgs(o, 'ps'))
-  const pre = pin ? `$p='${pin}'; ${PS_PIN_CALLBACK}; ` : ''
+  // The pin check comes from the server (a compiled .NET class, so it also
+  // works unattended); without it there is no safe way to pin, so the
+  // command is left unpinned and the installer refuses the self-signed
+  // certificate rather than trusting it.
+  const pre = pin && o.info.ps_pin_check ? `$p='${pin}'; ${o.info.ps_pin_check}; ` : ''
   return `${pre}[Net.ServicePointManager]::SecurityProtocol='Tls12'; & ([scriptblock]::Create((irm ${o.info.server_url}/install/agent.ps1))) ${args.join(' ')}`
 }
 

@@ -2,8 +2,9 @@ import { describe, expect, it } from 'vitest'
 import { findPackage, msiCommand, packageCommand, parseOperatorKeys, scriptCommand, urlLooksWrong, windowsCommand } from './installcmd'
 
 import type { InstallInfo } from './types'
-const base: Pick<InstallInfo, 'server_url' | 'tls_mode' | 'ca_fingerprint' | 'spki_sha256'> = { server_url: 'https://mon.example', tls_mode: 'acme', ca_fingerprint: '', spki_sha256: '' }
-const self: typeof base = { ...base, tls_mode: 'selfsigned', ca_fingerprint: 'sha256:aa', spki_sha256: 'QUJD+/=' }
+const base: Pick<InstallInfo, 'server_url' | 'tls_mode' | 'ca_fingerprint' | 'spki_sha256' | 'ps_pin_check'> = { server_url: 'https://mon.example', tls_mode: 'acme', ca_fingerprint: '', spki_sha256: '' }
+const PIN_CHECK = "if(-not('SentrelPin' -as [type])){Add-Type -TypeDefinition 'public static class SentrelPin{}'}; [SentrelPin]::Pin=$p; [SentrelPin]::On()"
+const self: typeof base = { ...base, tls_mode: 'selfsigned', ca_fingerprint: 'sha256:aa', spki_sha256: 'QUJD+/=', ps_pin_check: PIN_CHECK }
 const opts = (info: typeof base, extra: Record<string, unknown> = {}) => ({ info, token: 'ABCD-1234-WXYZ', policy: 'server' as const, operatorKeys: [], docker: false, ...extra })
 
 describe('install commands', () => {
@@ -16,7 +17,9 @@ describe('install commands', () => {
     expect(c).toContain('--ca-fingerprint sha256:aa --pin-sha256 QUJD+/=')
     expect(c).not.toContain('insecure')
     const w = windowsCommand(opts(self))
-    expect(w.startsWith("$p='QUJD+/='; [Net.ServicePointManager]::ServerCertificateValidationCallback=")).toBe(true)
+    // The pin check is the server's (compiled .NET), never a script block.
+    expect(w.startsWith(`$p='QUJD+/='; ${PIN_CHECK}; [Net.ServicePointManager]::SecurityProtocol='Tls12'`)).toBe(true)
+    expect(w).not.toContain('ServerCertificateValidationCallback={')
     expect(w).toContain('-PinSha256 QUJD+/=')
     expect(w).not.toContain('{$true}')
   })

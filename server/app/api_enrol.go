@@ -275,7 +275,11 @@ type installInfo struct {
 	TLSMode       string           `json:"tls_mode"`
 	CAFingerprint string           `json:"ca_fingerprint"`
 	SPKISHA256    string           `json:"spki_sha256"`
-	Packages      []installPackage `json:"packages"`
+	// PSPinCheck is the PowerShell that installs the certificate pin check for
+	// $p (self-signed mode). The Agents page builds the Windows command from
+	// it, so there is one definition of the check, here on the server.
+	PSPinCheck string           `json:"ps_pin_check,omitempty"`
+	Packages   []installPackage `json:"packages"`
 }
 
 // apiInstallInfo describes how to install an agent from this server: the
@@ -297,6 +301,7 @@ func (a *App) apiInstallInfo(c *Ctx) (any, error) {
 	if mode == "selfsigned" {
 		info.CAFingerprint = a.ca.Fingerprint()
 		info.SPKISHA256 = a.ca.ServerSPKI()
+		info.PSPinCheck = psPinCallback
 	}
 	for _, p := range agentdist.Packages(a.cfg.AgentBinDir) {
 		info.Packages = append(info.Packages, installPackage{OS: p.OS, Arch: p.Arch, Format: p.Format, File: p.File,
