@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { ReleaseNotes } from '@/components/ReleaseNotes'
-import { dismiss, installHelp, isActivePhase, isDismissed, isFinalPhase, parseInline, parseNotes, showBanner, showPill, stepIndex, STEPS, type UpdateInfo } from './updates'
+import { dismiss, installHelp, isActivePhase, isDismissed, isFinalPhase, parseInline, parseNotes, showBanner, showPill, stepIndex, STEPS, updateView, type UpdateInfo } from './updates'
 
 const info = (o: Partial<UpdateInfo> = {}): UpdateInfo => ({ current: '0.9.1', latest: '0.9.2', update_available: true, check_enabled: true, ...o })
 const memStore = () => { const m = new Map<string, string>(); return { getItem: (k: string) => m.get(k) ?? null, setItem: (k: string, v: string) => void m.set(k, v) } }
@@ -82,5 +82,27 @@ describe('install help', () => {
     expect(installHelp('package', '0.9.2').steps.map((s) => s.code).join('\n')).toContain('apt install --only-upgrade sentrel-server')
     expect(installHelp('package', '0.9.2').steps.map((s) => s.code).join('\n')).toContain('dnf upgrade sentrel-server')
     expect(installHelp('manual', '0.9.2').title).toContain('manually')
+  })
+})
+
+describe('updates page view', () => {
+  const now = 1_800_000_000
+  const u = { latest: '0.9.9', update_available: true, can_install: true }
+  it('hides an old finished update once a newer release exists, and offers the install', () => {
+    const v = updateView(u, { phase: 'done', version: '0.9.8', finished_at: now - 3600 }, false, now)
+    expect(v).toEqual({ showProgress: false, showInstall: true })
+  })
+  it('keeps a failed attempt at the latest release visible and allows a retry', () => {
+    const v = updateView(u, { phase: 'rolled_back', version: '0.9.9', finished_at: now - 60 }, false, now)
+    expect(v).toEqual({ showProgress: true, showInstall: true })
+  })
+  it('shows the result of installing the latest release for a day', () => {
+    const done = { phase: 'done', version: 'v0.9.9', finished_at: now - 60 }
+    expect(updateView({ ...u, update_available: false }, done, false, now)).toEqual({ showProgress: true, showInstall: false })
+    expect(updateView({ ...u, update_available: false }, { ...done, finished_at: now - 2 * 86400 }, false, now).showProgress).toBe(false)
+  })
+  it('hides the install button while an update runs', () => {
+    expect(updateView(u, { phase: 'downloading', version: '0.9.9' }, false, now)).toEqual({ showProgress: true, showInstall: false })
+    expect(updateView(u, undefined, true, now).showInstall).toBe(false)
   })
 })

@@ -4,7 +4,7 @@ import { AlertTriangle, ArrowUpCircle, Check, CheckCircle2, ExternalLink, Loader
 import { get, post, put } from '@/lib/api'
 import { ago, dateTime } from '@/lib/format'
 import {
-  STEPS, installHelp, isActivePhase, isFinalPhase, phaseLabel, stepIndex,
+  STEPS, installHelp, isActivePhase, isFinalPhase, phaseLabel, stepIndex, updateView,
   type InstallStatus, type UpdateInfo,
 } from '@/lib/updates'
 import { ReleaseNotes } from '@/components/ReleaseNotes'
@@ -88,8 +88,7 @@ export function UpdatesTab() {
   }
 
   const disabledByHost = u.check_forced_off
-  const recent = !!st?.finished_at && Date.now() / 1000 - st.finished_at < 24 * 3600
-  const showProgress = watching || active || (isFinalPhase(st?.phase) && recent)
+  const { showProgress, showInstall } = updateView(u, st, watching)
   const showHelp = u.update_available && u.method && u.method !== 'systemd'
 
   return (
@@ -112,7 +111,7 @@ export function UpdatesTab() {
                 {!!u.published_at && <span className="text-muted">Published {dateTime(u.published_at)}</span>}
               </div>
             </div>
-            {u.update_available && u.can_install && !showProgress && (
+            {showInstall && (
               <Button variant="primary" loading={busy === 'install'} onClick={install} icon={<ArrowUpCircle className="size-4" />}>Install update</Button>
             )}
           </div>

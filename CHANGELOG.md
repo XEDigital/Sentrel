@@ -4,6 +4,12 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
+## [0.9.10] - 2026-10-18
+
+### Fixed
+
+- Settings, Updates hid the Install update button for 24 hours after an update, even when a newer release had come out, and kept showing "Update installed" for the previous version. A finished update is now shown only while it is about the latest release, and the install button is available whenever no update is running, including to retry after a failed or rolled-back update. Servers on 0.9.8 or 0.9.9 hit this in their own Updates page: if the button is missing, wait a day or update by hand as described in docs/install.md (Upgrading).
+
 ## [0.9.9] - 2026-10-18
 
 ### Fixed

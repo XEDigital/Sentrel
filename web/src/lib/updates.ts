@@ -81,6 +81,25 @@ const ACTIVE = new Set([...STEPS.map((s) => s.id), 'rolling_back'])
 export const isActivePhase = (p?: string) => !!p && ACTIVE.has(p)
 export const isFinalPhase = (p?: string) => p === 'done' || p === 'failed' || p === 'rolled_back'
 
+const bare = (v?: string) => (v ?? '').replace(/^v/, '')
+
+/**
+ * What the Updates page shows. A finished attempt (installed, failed or rolled
+ * back) is shown for a day, but only while it is about the latest release: once
+ * a newer one is out, "updated to 0.9.8" is old news. The install button
+ * depends only on nothing running, so it stays available to retry a failed
+ * update or to install a newer release.
+ */
+export function updateView(u: Pick<UpdateInfo, 'latest' | 'update_available'> & { can_install?: boolean }, st: InstallStatus | undefined, watching: boolean, nowSec = Date.now() / 1000) {
+  const running = watching || isActivePhase(st?.phase)
+  const recent = !!st?.finished_at && nowSec - st.finished_at < 24 * 3600
+  const aboutLatest = !!st?.version && !!u.latest && bare(st.version) === bare(u.latest)
+  return {
+    showProgress: running || (isFinalPhase(st?.phase) && recent && aboutLatest),
+    showInstall: !!u.update_available && !!u.can_install && !running,
+  }
+}
+
 /** Index of the current step, or STEPS.length once finished. */
 export function stepIndex(phase?: string): number {
   if (phase === 'done') return STEPS.length
