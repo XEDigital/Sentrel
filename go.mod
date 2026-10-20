@@ -3,15 +3,15 @@ module sentrel
 go 1.26.9
 
 require (
-	github.com/Microsoft/go-winio v0.6.3
+	github.com/Microsoft/go-winio v0.6.4
 	github.com/anchore/clio v0.1.1
 	github.com/anchore/grype v0.120.1
 	github.com/anchore/syft v1.54.1
 	github.com/coreos/go-oidc/v3 v3.21.0
 	github.com/expr-lang/expr v1.17.8
 	github.com/glebarez/go-sqlite v1.23.0
-	github.com/go-chi/chi/v5 v5.3.2
-	github.com/go-jose/go-jose/v4 v4.1.5
+	github.com/go-chi/chi/v5 v5.5.0
+	github.com/go-jose/go-jose/v4 v4.1.6
 	github.com/go-ldap/ldap/v3 v3.4.15
 	github.com/go-ole/go-ole v1.3.0
 	github.com/go-webauthn/webauthn v0.18.2
