@@ -4,6 +4,16 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
+## [0.9.12] - 2026-10-24
+
+### Security
+
+- Built with Go 1.26.10, which fixes GO-2026-6809: `crypto/x509` now distrusts compromised intermediate certificates. Certificate checks used this code path.
+
+### Changed
+
+- Dependency updates: go-chi 5.5.0, go-jose 4.1.6, go-winio 0.6.4, React 19.3.1, TanStack Query 5.104.3, lucide-react 1.59.0, Vitest 5.0.5.
+
 ## [0.9.11] - 2026-10-24
 
 ### Fixed
