@@ -364,7 +364,7 @@ func (v *VulnService) ScanHost(ctx context.Context, hostID int64, trigger string
 	}
 	pkgs := make([]vuln.Package, 0, len(rows))
 	for _, r := range rows {
-		pkgs = append(pkgs, vuln.Package{Name: r.Name, Version: r.Version, Arch: r.Arch, Type: r.Type, Source: r.Source})
+		pkgs = append(pkgs, vuln.Package{Name: r.Name, Version: r.Version, Arch: r.Arch, Type: r.Type, Source: r.Source, SourceVersion: r.SourceVersion})
 	}
 	sctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
 	defer cancel()
@@ -441,16 +441,22 @@ func (v *VulnService) evaluate(ctx context.Context, h *Host) {
 	if s.AlertSeverity != "" && s.AlertSeverity != "none" {
 		min := vuln.SeverityRank(s.AlertSeverity)
 		total, crit := 0, 0
-		for _, cv := range a.hostCVEs(ctx, h, a.loadKernels(ctx, h)) {
+		// Decorated findings, so "fixable" means actionable now, as in the
+		// counts and the "Fixable now" filter: a fix that is not yet in the
+		// host's repositories (wait) does not count.
+		list := a.openFindings(ctx, h.ID)
+		for i := range list {
+			cv := &list[i]
 			if cv.Inactive && !s.AlertOnInactiveKernels {
 				continue // a kernel that is installed but not running is not exploitable
 			}
-			if s.OnlyFixable && !cv.Fixable {
+			if s.OnlyFixable && !actionable(cv) {
 				continue
 			}
-			if vuln.SeverityRank(cv.Severity) >= min {
-				total++
+			if vuln.SeverityRank(cv.Severity) < min {
+				continue
 			}
+			total++
 			if cv.Severity == "Critical" {
 				crit++
 			}
@@ -460,12 +466,12 @@ func (v *VulnService) evaluate(ctx context.Context, h *Host) {
 			if crit > 0 {
 				cond.Severity = "critical"
 			}
-			fixable := ""
+			fixable, fixNote := "", ""
 			if s.OnlyFixable {
-				fixable = " fixable"
+				fixable, fixNote = " fixable", ", fixable now"
 			}
 			cond.Title = fmt.Sprintf("%d%s vulnerabilities on %s", total, fixable, h.Name)
-			cond.Message = fmt.Sprintf("%d critical, %d at or above %s severity with fixes available", crit, total, s.AlertSeverity)
+			cond.Message = fmt.Sprintf("%d critical, %d at or above %s severity%s", crit, total, s.AlertSeverity, fixNote)
 			val := float64(total)
 			cond.Value = &val
 		}

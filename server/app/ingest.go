@@ -182,6 +182,11 @@ func (a *App) ingestInventory(ctx context.Context, hostID int64, inv *pb.Invento
 	for _, k := range keys {
 		r := rows[k]
 		h.Write([]byte(r.Name + "\x00" + r.Version + "\x00" + r.Arch + "\x00"))
+		if r.SourceVersion != "" {
+			// Only when set, so hashes of inventories without it are unchanged; an
+			// agent that starts sending it triggers one rescan.
+			h.Write([]byte("src\x00" + r.SourceVersion + "\x00"))
+		}
 	}
 	newHash := hex.EncodeToString(h.Sum(nil))
 
@@ -190,15 +195,15 @@ func (a *App) ingestInventory(ctx context.Context, hostID int64, inv *pb.Invento
 			if _, err := tx.ExecContext(ctx, `DELETE FROM packages WHERE host_id=?`, hostID); err != nil {
 				return err
 			}
-			stmt, err := tx.PrepareContext(ctx, `INSERT OR REPLACE INTO packages (tenant_id, host_id, name, version, arch, type, source, new_version, security, kb, publisher)
-				VALUES (?,?,?,?,?,?,?,?,?,?,?)`)
+			stmt, err := tx.PrepareContext(ctx, `INSERT OR REPLACE INTO packages (tenant_id, host_id, name, version, arch, type, source, source_version, new_version, security, kb, publisher)
+				VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`)
 			if err != nil {
 				return err
 			}
 			defer stmt.Close()
 			for _, k := range keys {
 				p := rows[k]
-				if _, err := stmt.ExecContext(ctx, tenant, hostID, p.Name, p.Version, p.Arch, p.Type, p.Source, p.NewVersion, p.Security, p.Kb, p.Publisher); err != nil {
+				if _, err := stmt.ExecContext(ctx, tenant, hostID, p.Name, p.Version, p.Arch, p.Type, p.Source, p.SourceVersion, p.NewVersion, p.Security, p.Kb, p.Publisher); err != nil {
 					return err
 				}
 			}

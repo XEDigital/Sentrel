@@ -104,10 +104,18 @@ func lastLine(out []byte, err error) string {
 }
 
 func dpkgInstalled(ctx context.Context) ([]*pb.Package, error) {
-	out, err := runOut(ctx, 2*time.Minute, "dpkg-query", "-W", "-f", "${db:Status-Abbrev}\t${binary:Package}\t${Version}\t${Architecture}\t${source:Package}\n")
+	out, err := runOut(ctx, 2*time.Minute, "dpkg-query", "-W", "-f", "${db:Status-Abbrev}\t${binary:Package}\t${Version}\t${Architecture}\t${source:Package}\t${source:Version}\n")
 	if err != nil {
 		return nil, fmt.Errorf("dpkg-query: %w", err)
 	}
+	return parseDpkgQuery(out), nil
+}
+
+// parseDpkgQuery parses the dpkg-query lines of dpkgInstalled. The source
+// version is kept only when it differs from the binary version (libldb2
+// 2:2.6.2+samba4.17.12-… is built from samba 2:4.17.12-…), because the
+// vulnerability data is keyed by source package and source version.
+func parseDpkgQuery(out []byte) []*pb.Package {
 	var pkgs []*pb.Package
 	s := bufio.NewScanner(bytes.NewReader(out))
 	s.Buffer(make([]byte, 1<<20), 1<<20)
@@ -124,9 +132,13 @@ func dpkgInstalled(ctx context.Context) ([]*pb.Package, error) {
 		if src == "" {
 			src = name
 		}
-		pkgs = append(pkgs, &pb.Package{Name: name, Version: f[2], Arch: f[3], Source: src, Type: "deb"})
+		p := &pb.Package{Name: name, Version: f[2], Arch: f[3], Source: src, Type: "deb"}
+		if len(f) > 5 && f[5] != f[2] {
+			p.SourceVersion = f[5]
+		}
+		pkgs = append(pkgs, p)
 	}
-	return pkgs, nil
+	return pkgs
 }
 
 // "openssl/noble-updates,noble-security 3.0.13-0ubuntu3.4 amd64 [upgradable from: 3.0.13-0ubuntu3.1]"

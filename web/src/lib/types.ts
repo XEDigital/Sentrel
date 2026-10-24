@@ -425,6 +425,8 @@ export interface Package {
   arch: string
   type: string
   source: string
+  /** deb: the source package's version, when it differs from version. */
+  source_version?: string
   new_version: string
   security: boolean
   kb: string

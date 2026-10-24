@@ -234,6 +234,7 @@ message Package {
   string type = 8;        // deb, rpm, apk, pacman, msi, windows-update
   string publisher = 9;
   repeated string cves = 10; // Windows Update: CVE ids the update addresses
+  string source_version = 11; // deb: version of the source package, when it differs from version
 }
 
 message SecurityReport {

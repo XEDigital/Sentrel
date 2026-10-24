@@ -254,10 +254,56 @@ func TestInactiveKernelsDoNotAlert(t *testing.T) {
 	}
 	// An active finding alerts even by default.
 	enableVuln(t, e)
-	e.addFinding(t, h, "CVE-ACTIVE", "linux-image-7.0.0-38-generic", "7.0.0-39.1", "Critical")
+	e.addFinding(t, h, "CVE-ACTIVE", "bash", "5.1-2", "Critical")
 	e.a.vuln.evaluate(ctx, host)
 	if al := vulnAlert(e, h); al == nil || !strings.Contains(al.Title, "1 fixable") {
 		t.Fatalf("expected an alert with 1 finding, got %+v", al)
+	}
+}
+
+// With only_fixable, the alert counts what is fixable now, as the counts and
+// the "Fixable now" filter do: a fix that is not in the repositories yet does
+// not count, so the alert never promises a fix the UI cannot offer.
+func TestVulnAlertCountsOnlyActionable(t *testing.T) {
+	e := newTestEnv(t)
+	admin := e.setupAdmin()
+	ctx := context.Background()
+	h, _ := e.enrol(admin)
+	e.seedKernelHost(t, h, "7.0.0-38-generic", []string{"7.0.0-38"}, "")
+	// bash has 5.1-3 pending, below these fixes: remediation wait.
+	e.addFinding(t, h, "CVE-WAIT-1", "bash", "5.1-9", "Critical")
+	e.addFinding(t, h, "CVE-WAIT-2", "openssl", "3.0.2-1", "Critical")
+	// The running, newest kernel with no meta-package update: wait.
+	e.addFinding(t, h, "CVE-WAIT-K", "linux-image-7.0.0-38-generic", "7.0.0-39.1", "Critical")
+	host, _ := e.a.getHost(ctx, h)
+
+	enableVuln(t, e)
+	e.a.vuln.evaluate(ctx, host)
+	if al := vulnAlert(e, h); al != nil {
+		t.Fatalf("alert raised for fixes not yet available: %+v", al)
+	}
+	if got := e.findings(t, admin, "?host_id="+itoa(h)+"&fixable=1"); len(got) != 0 {
+		t.Fatalf("fixable filter: %v", got)
+	}
+
+	// A pending update that reaches the fix makes one actionable.
+	e.addFinding(t, h, "CVE-UP", "bash", "5.1-2", "Critical")
+	e.a.vuln.evaluate(ctx, host)
+	al := vulnAlert(e, h)
+	if al == nil || !strings.Contains(al.Title, "1 fixable") || !strings.Contains(al.Message, "fixable now") {
+		t.Fatalf("expected an alert with 1 fixable finding, got %+v", al)
+	}
+	if got := e.findings(t, admin, "?host_id="+itoa(h)+"&fixable=1"); len(got) != 1 || !got["CVE-UP"].Upgradable {
+		t.Fatalf("fixable filter should list the one upgradable CVE: %v", got)
+	}
+
+	// Without only_fixable every open CVE counts.
+	if err := e.a.settings.Save(ctx, 0, keyVuln, VulnSettings{Enabled: true, AlertSeverity: "Critical"}); err != nil {
+		t.Fatal(err)
+	}
+	e.a.vuln.evaluate(ctx, host)
+	if al := vulnAlert(e, h); al == nil || !strings.HasPrefix(al.Title, "4 vulnerabilities") || strings.Contains(al.Message, "fixable") {
+		t.Fatalf("expected an alert with 4 findings, got %+v", al)
 	}
 }
 

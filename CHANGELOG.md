@@ -4,6 +4,13 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
+## [0.9.11] - 2026-10-24
+
+### Fixed
+
+- Debian and Ubuntu packages whose version differs from their source package's, such as `libldb2` built from `samba`, were matched by their own version against the source package's fixed versions, so they showed CVEs that were already fixed (for example samba CVEs on Debian 12). The agent now reports the source version (`${source:Version}`) and the scanner matches by it; pending updates of such packages are offered as upgrades. Update agents to clear the false findings: the first inventory from an updated agent triggers a rescan.
+- The vulnerability alert counted every CVE with a known fixed version as fixable, so it could report fixable vulnerabilities on a host whose fixes were not yet in its repositories, with no upgrade offered. With "Alert only on vulnerabilities that are fixable now" on (the default), the alert now counts the same CVEs as the "Fixable now" count and filter: a package or kernel upgrade, an old kernel to remove or a reboot. It is also evaluated after each package inventory, so it follows newly pending updates without waiting for the next scan.
+
 ## [0.9.10] - 2026-10-18
 
 ### Fixed

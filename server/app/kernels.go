@@ -472,6 +472,10 @@ func (a *App) afterInventory(ctx context.Context, hostID int64) {
 	k := a.loadKernels(ctx, h)
 	a.kernelSamples(ctx, h, k)
 	a.maybeAutoRemoveKernels(ctx, h, k)
+	if a.settings.Vuln().Enabled {
+		// What is fixable now depends on the pending updates just reported.
+		a.vuln.evaluate(ctx, h)
+	}
 }
 
 // finishRemediation sets inactive, remediation and kernel_abi on a finding.

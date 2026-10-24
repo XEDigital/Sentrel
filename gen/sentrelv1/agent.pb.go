@@ -1850,7 +1850,8 @@ type Package struct {
 	Kb            string                 `protobuf:"bytes,7,opt,name=kb,proto3" json:"kb,omitempty"`                                   // Windows KB
 	Type          string                 `protobuf:"bytes,8,opt,name=type,proto3" json:"type,omitempty"`                               // deb, rpm, apk, pacman, msi, windows-update
 	Publisher     string                 `protobuf:"bytes,9,opt,name=publisher,proto3" json:"publisher,omitempty"`
-	Cves          []string               `protobuf:"bytes,10,rep,name=cves,proto3" json:"cves,omitempty"` // Windows Update: CVE ids the update addresses
+	Cves          []string               `protobuf:"bytes,10,rep,name=cves,proto3" json:"cves,omitempty"`                                        // Windows Update: CVE ids the update addresses
+	SourceVersion string                 `protobuf:"bytes,11,opt,name=source_version,json=sourceVersion,proto3" json:"source_version,omitempty"` // deb: version of the source package, when it differs from version
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1953,6 +1954,13 @@ func (x *Package) GetCves() []string {
 		return x.Cves
 	}
 	return nil
+}
+
+func (x *Package) GetSourceVersion() string {
+	if x != nil {
+		return x.SourceVersion
+	}
+	return ""
 }
 
 type SecurityReport struct {
@@ -3387,7 +3395,7 @@ const file_sentrel_v1_agent_proto_rawDesc = "" +
 	"upgradable\x18\x04 \x03(\v2\x13.sentrel.v1.PackageR\n" +
 	"upgradable\x12\x14\n" +
 	"\x05error\x18\x05 \x01(\tR\x05error\x124\n" +
-	"\x16security_updates_known\x18\x06 \x01(\bR\x14securityUpdatesKnown\"\xf6\x01\n" +
+	"\x16security_updates_known\x18\x06 \x01(\bR\x14securityUpdatesKnown\"\x9d\x02\n" +
 	"\aPackage\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x18\n" +
 	"\aversion\x18\x02 \x01(\tR\aversion\x12\x12\n" +
@@ -3400,7 +3408,8 @@ const file_sentrel_v1_agent_proto_rawDesc = "" +
 	"\x04type\x18\b \x01(\tR\x04type\x12\x1c\n" +
 	"\tpublisher\x18\t \x01(\tR\tpublisher\x12\x12\n" +
 	"\x04cves\x18\n" +
-	" \x03(\tR\x04cves\"\xf4\x02\n" +
+	" \x03(\tR\x04cves\x12%\n" +
+	"\x0esource_version\x18\v \x01(\tR\rsourceVersion\"\xf4\x02\n" +
 	"\x0eSecurityReport\x12&\n" +
 	"\x0fwindow_start_ms\x18\x01 \x01(\x03R\rwindowStartMs\x12\"\n" +
 	"\rwindow_end_ms\x18\x02 \x01(\x03R\vwindowEndMs\x12=\n" +

@@ -436,7 +436,7 @@ function Vuln({ data }: { data: any }) {
           <div className="py-3"><Checkbox checked={deleteDb} onChange={setDeleteDb} label="Also delete the downloaded database to free disk space" /></div>
         )}
         <SettingRow label="Rescan a host whenever its packages change"><Toggle checked={!!v.scan_after_inventory} onChange={(x) => set({ scan_after_inventory: x })} /></SettingRow>
-        <SettingRow label="Alert only on vulnerabilities with a fix available"><Toggle checked={!!v.only_fixable} onChange={(x) => set({ only_fixable: x })} /></SettingRow>
+        <SettingRow label="Alert only on vulnerabilities that are fixable now"><Toggle checked={!!v.only_fixable} onChange={(x) => set({ only_fixable: x })} /></SettingRow>
         <SettingRow label="Alert on kernels that are not running" info="Off by default: an old kernel that is installed but not booted is not exploitable. The findings stay visible in the list either way.">
           <Toggle checked={!!v.alert_on_inactive_kernels} onChange={(x) => set({ alert_on_inactive_kernels: x })} />
         </SettingRow>

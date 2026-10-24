@@ -406,17 +406,19 @@ const jobCols = `j.id, j.tenant_id, j.host_id, j.type, j.params, j.dry_run, j.st
  j.timeout_seconds, j.requested_by, j.confirmed_by, j.created_at, j.sent_at, j.started_at, j.finished_at, j.exit_code, j.error, j.operator_key_id`
 
 type Package struct {
-	TenantID   int64  `db:"tenant_id" json:"-"`
-	HostID     int64  `db:"host_id" json:"host_id"`
-	Name       string `db:"name" json:"name"`
-	Version    string `db:"version" json:"version"`
-	Arch       string `db:"arch" json:"arch"`
-	Type       string `db:"type" json:"type"`
-	Source     string `db:"source" json:"source"`
-	NewVersion string `db:"new_version" json:"new_version"`
-	Security   bool   `db:"security" json:"security"`
-	KB         string `db:"kb" json:"kb"`
-	Publisher  string `db:"publisher" json:"publisher"`
+	TenantID int64  `db:"tenant_id" json:"-"`
+	HostID   int64  `db:"host_id" json:"host_id"`
+	Name     string `db:"name" json:"name"`
+	Version  string `db:"version" json:"version"`
+	Arch     string `db:"arch" json:"arch"`
+	Type     string `db:"type" json:"type"`
+	Source   string `db:"source" json:"source"`
+	// SourceVersion is the source package's version (deb), when it differs from Version.
+	SourceVersion string `db:"source_version" json:"source_version,omitempty"`
+	NewVersion    string `db:"new_version" json:"new_version"`
+	Security      bool   `db:"security" json:"security"`
+	KB            string `db:"kb" json:"kb"`
+	Publisher     string `db:"publisher" json:"publisher"`
 }
 
 type InventoryStatus struct {

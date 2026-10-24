@@ -167,6 +167,10 @@ type Package struct {
 	Arch    string
 	Type    string // deb, rpm, apk
 	Source  string // source package name (deb) or source rpm
+	// SourceVersion is the source package's version (deb). Debian data is keyed
+	// by source version, so a binary with its own version (libldb2 from samba)
+	// must be compared by it; empty means the binary version.
+	SourceVersion string
 }
 
 // Finding is one vulnerability match.
@@ -228,6 +232,19 @@ func (s *Scanner) Scan(ctx context.Context, osID, osVersion string, pkgs []Packa
 	if d == nil {
 		return nil, fmt.Errorf("%w: %s %s", ErrUnsupported, osID, osVersion)
 	}
+	gp := grypePackages(d, pkgs)
+	m := grype.VulnerabilityMatcher{VulnerabilityProvider: s.provider, Matchers: matcher.NewDefaultMatchers(matcher.Config{}), NormalizeByCVE: true}
+	res, _, err := m.FindMatchesContext(ctx, gp, pkg.Context{Distro: d})
+	if err != nil {
+		return nil, err
+	}
+	return s.toFindings(res.Sorted()), nil
+}
+
+// grypePackages converts inventory packages for the matcher. A package built
+// from a differently named source package gets it as its upstream, with the
+// source version for debs.
+func grypePackages(d *distro.Distro, pkgs []Package) []pkg.Package {
 	var gp []pkg.Package
 	for i, p := range pkgs {
 		t := pkgType(p.Type)
@@ -241,17 +258,16 @@ func (s *Scanner) Scan(ctx context.Context, osID, osVersion string, pkgs []Packa
 				src = rpmSourceName(src)
 			}
 			if src != "" {
-				g.Upstreams = []pkg.UpstreamPackage{{Name: src}}
+				up := pkg.UpstreamPackage{Name: src}
+				if t == syftPkg.DebPkg {
+					up.Version = p.SourceVersion
+				}
+				g.Upstreams = []pkg.UpstreamPackage{up}
 			}
 		}
 		gp = append(gp, g)
 	}
-	m := grype.VulnerabilityMatcher{VulnerabilityProvider: s.provider, Matchers: matcher.NewDefaultMatchers(matcher.Config{}), NormalizeByCVE: true}
-	res, _, err := m.FindMatchesContext(ctx, gp, pkg.Context{Distro: d})
-	if err != nil {
-		return nil, err
-	}
-	return s.toFindings(res.Sorted()), nil
+	return gp
 }
 
 func rpmSourceName(srpm string) string {

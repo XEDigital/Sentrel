@@ -4,8 +4,8 @@ Sentrel matches each Linux host's package inventory against the [Grype](https://
 
 ## How matching works
 
-1. The agent reports installed packages (name, version, architecture, package type `deb`/`rpm`/`apk`, source package) with the host's `os-release` `ID` and `VERSION_ID`.
-2. The server converts them to Grype package records with the host's distribution and runs Grype's default matchers, including source-package ("upstream") matching, and normalises results by CVE.
+1. The agent reports installed packages (name, version, architecture, package type `deb`/`rpm`/`apk`, source package and, for `deb`, the source package's version when it differs from the binary's) with the host's `os-release` `ID` and `VERSION_ID`.
+2. The server converts them to Grype package records with the host's distribution and runs Grype's default matchers, including source-package ("upstream") matching, and normalises results by CVE. Debian and Ubuntu data is keyed by source package, so a binary with its own version number (for example `libldb2` `2:2.6.2+samba4.17.12…`, built from `samba` `2:4.17.12…`) is compared by its source version. Agents before 0.9.11 do not report it, and such packages can show CVEs that are already fixed until the agent is updated.
 3. Each finding stores the CVE/advisory id, package, installed and fixed version, fix state, severity (Critical, High, Medium, Low, Negligible, Unknown), CVSS score and vector, EPSS, whether it is in CISA's Known Exploited Vulnerabilities catalogue, description and reference URLs.
 4. Findings that were present before but are no longer matched become `fixed`. Findings you ignored stay ignored. Per-host counts are stored as the `vulnerabilities_open{severity}` series.
 
@@ -67,7 +67,7 @@ Scans run one at a time from a queue with a 10 minute limit each. The scan histo
 
 ## Alerts
 
-After each scan the server evaluates one alert per host. It counts distinct open CVEs at or above `alert_severity` (`Critical` default, `High`, `Medium`, or `none` to disable) and, when `only_fixable` is on (default), only those that have a fixed version. Findings that only affect a kernel that is installed but not running (see [Kernels](#kernels)) are not counted unless `alert_on_inactive_kernels` is on (default off). The alert is critical when any Critical finding is counted, otherwise warning, and clears when the count reaches zero. Notification channels, maintenance windows and acknowledgement behave as for any alert ([alerting.md](alerting.md)).
+After each scan the server evaluates one alert per host. It counts distinct open CVEs at or above `alert_severity` (`Critical` default, `High`, `Medium`, or `none` to disable) and, when `only_fixable` is on (default), only those that are fixable now (see [How CVEs are counted](#how-cves-are-counted): a fix not yet in the host's repositories does not count). It is evaluated again after each package inventory, since a newly pending update can make a CVE fixable. Findings that only affect a kernel that is installed but not running (see [Kernels](#kernels)) are not counted unless `alert_on_inactive_kernels` is on (default off). The alert is critical when any Critical finding is counted, otherwise warning, and clears when the count reaches zero. Notification channels, maintenance windows and acknowledgement behave as for any alert ([alerting.md](alerting.md)).
 
 ## Fixing findings with upgrades
 

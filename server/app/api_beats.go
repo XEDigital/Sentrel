@@ -199,7 +199,7 @@ func (a *App) hostNotifies(h *Host, metric string) bool {
 func (a *App) decorateFindings(c *Ctx, list []VulnFinding) { a.decorateFindingsCtx(c.ctx(), list) }
 
 func (a *App) decorateFindingsCtx(ctx context.Context, list []VulnFinding) {
-	type pkgUpdate struct{ newVer, typ string }
+	type pkgUpdate struct{ newVer, typ, srcVer string }
 	type hostData struct {
 		os      string
 		linux   bool
@@ -237,11 +237,12 @@ func (a *App) decorateFindingsCtx(ctx context.Context, list []VulnFinding) {
 			Name       string `db:"name"`
 			Type       string `db:"type"`
 			NewVersion string `db:"new_version"`
+			SrcVersion string `db:"source_version"`
 		}
-		_ = a.db.SelectContext(ctx, &pk, `SELECT name, type, new_version FROM packages WHERE host_id=? AND new_version<>''`, id)
+		_ = a.db.SelectContext(ctx, &pk, `SELECT name, type, new_version, source_version FROM packages WHERE host_id=? AND new_version<>''`, id)
 		for _, p := range pk {
 			if _, dup := d.updates[p.Name]; !dup {
-				d.updates[p.Name] = pkgUpdate{p.NewVersion, p.Type}
+				d.updates[p.Name] = pkgUpdate{p.NewVersion, p.Type, p.SrcVersion}
 			}
 		}
 		var fx []struct {
@@ -278,7 +279,9 @@ func (a *App) decorateFindingsCtx(ctx context.Context, list []VulnFinding) {
 			if fixed == "" {
 				continue
 			}
-			if ge, known := versionAtLeast(up.typ, up.newVer, fixed); !known || ge {
+			// A binary with its own version (libldb2 from samba) cannot be compared
+			// with a fix given as a source version; the pending update is taken as the fix.
+			if ge, known := versionAtLeast(up.typ, up.newVer, fixed); !known || ge || up.srcVer != "" {
 				f.Upgradable = true
 				f.AvailableVersion = up.newVer
 			}
