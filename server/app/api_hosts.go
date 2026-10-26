@@ -944,7 +944,7 @@ func (a *App) apiHostUptime(c *Ctx) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	days, pct := a.uptimeDays(c.ctx(), "host", h.ID, int(c.QInt("days", 90)))
+	days, pct := a.uptimeDays(c.ctx(), "host", h.ID, c.queryLimit("days", 90, 366))
 	return map[string]any{"days": days, "percent": pct}, nil
 }
 

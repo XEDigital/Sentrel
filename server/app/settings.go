@@ -223,7 +223,7 @@ func defaultFor(key string) any {
 	case keyProxyAuth:
 		return &ProxyAuthSettings{UserHeader: "Remote-User", EmailHeader: "Remote-Email", NameHeader: "Remote-Name", GroupsHeader: "Remote-Groups"}
 	case keySecurity:
-		return &SecuritySettings{Require2FA: "none", SessionHours: 12, PasswordMinLength: 10, LockoutAttempts: 8, LockoutMinutes: 15}
+		return &SecuritySettings{MetricsAuth: true, Require2FA: "none", SessionHours: 12, PasswordMinLength: 10, LockoutAttempts: 8, LockoutMinutes: 15}
 	case keyRetention:
 		return &RetentionSettings{Days: 31, HostStorageWarnMB: 512, DiskWarnPercent: 85, AlertHistoryDays: 180, AuditDays: 365, JobHistoryDays: 180, SecurityEventDays: 30}
 	case keyAgent:

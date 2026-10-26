@@ -40,7 +40,6 @@ type checkReq struct {
 	ParentID   *int64  `json:"parent_id"`
 }
 
-
 func (a *App) validateCheck(c *Ctx, req *checkReq) (int64, error) {
 	req.Name = strings.TrimSpace(req.Name)
 	req.Target = strings.TrimSpace(req.Target)
@@ -390,7 +389,7 @@ func (a *App) apiCheckHistory(c *Ctx) (any, error) {
 		return nil, err
 	}
 	start, end, step := parseRange(c, 24*time.Hour)
-	q := fmt.Sprintf(`%scheck_latency_ms{check_id="%d"}`, metrics.Prefix, k.ID)
+	q := fmt.Sprintf(`%scheck_latency_ms{check_id="%d",tenant_id="%d"}`, metrics.Prefix, k.ID, k.TenantID)
 	if step > time.Minute {
 		q = fmt.Sprintf("avg_over_time(%s[%ds])", q, int(step.Seconds()))
 	}
@@ -398,7 +397,7 @@ func (a *App) apiCheckHistory(c *Ctx) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	upq := fmt.Sprintf(`min_over_time(%scheck_up{check_id="%d"}[%ds])`, metrics.Prefix, k.ID, int(step.Seconds()))
+	upq := fmt.Sprintf(`min_over_time(%scheck_up{check_id="%d",tenant_id="%d"}[%ds])`, metrics.Prefix, k.ID, k.TenantID, int(step.Seconds()))
 	up, _ := a.ts.QueryRange(c.ctx(), upq, start, end, step)
 	days, pct := a.uptimeDays(c.ctx(), "check", k.ID, 90)
 	var latency, upPoints []metrics.Point
@@ -409,7 +408,7 @@ func (a *App) apiCheckHistory(c *Ctx) (any, error) {
 		upPoints = up[0].Points
 	}
 	if k.Type == "cert" || checkConfig(k).CheckCert {
-		q := fmt.Sprintf(`%scheck_cert_days{check_id="%d"}`, metrics.Prefix, k.ID)
+		q := fmt.Sprintf(`%scheck_cert_days{check_id="%d",tenant_id="%d"}`, metrics.Prefix, k.ID, k.TenantID)
 		if s, err := a.ts.QueryInstant(c.ctx(), "last_over_time("+q+"[1d])", time.Now()); err == nil && len(s) > 0 {
 			return map[string]any{"latency": latency, "up": upPoints, "uptime_days": days, "uptime_percent": pct, "cert_days": s[0].Points[0][1]}, nil
 		}
@@ -612,10 +611,7 @@ func (a *App) apiListAlerts(c *Ctx) (any, error) {
 		q += ` AND severity=?`
 		args = append(args, sev)
 	}
-	limit := c.QInt("limit", 200)
-	if limit > 2000 {
-		limit = 2000
-	}
+	limit := c.queryLimit("limit", 200, 2000)
 	q += ` ORDER BY COALESCE(NULLIF(resolved_at,0), fired_at) DESC LIMIT ?`
 	args = append(args, limit)
 	if err := a.db.SelectContext(c.ctx(), &out, q, args...); err != nil {
@@ -737,10 +733,7 @@ func (a *App) apiAlertEvents(c *Ctx) (any, error) {
 		q += ` AND e.id<?`
 		args = append(args, b)
 	}
-	limit := c.QInt("limit", 100)
-	if limit > 1000 {
-		limit = 1000
-	}
+	limit := c.queryLimit("limit", 100, 1000)
 	q += ` ORDER BY e.id DESC LIMIT ?`
 	args = append(args, limit)
 	out := []AlertEvent{}

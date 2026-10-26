@@ -95,3 +95,32 @@ func (g Guard) Transport(base *http.Transport) *http.Transport {
 	}
 	return base
 }
+
+// LocalDialer confines health probes to this machine, after DNS resolution.
+// It must accompany TLS verification exceptions for local self-signed health
+// checks; redirects must also be disabled by the HTTP client.
+func LocalDialer(timeout time.Duration) *net.Dialer {
+	return &net.Dialer{Timeout: timeout, Control: func(network, address string, _ syscall.RawConn) error {
+		host, _, err := net.SplitHostPort(address)
+		if err != nil {
+			return fmt.Errorf("%w: invalid health probe address", ErrBlocked)
+		}
+		ip := net.ParseIP(host)
+		if ip == nil {
+			return fmt.Errorf("%w: health probe address must be resolved", ErrBlocked)
+		}
+		if ip.IsLoopback() {
+			return nil
+		}
+		addrs, err := net.InterfaceAddrs()
+		if err != nil {
+			return err
+		}
+		for _, addr := range addrs {
+			if subnet, ok := addr.(*net.IPNet); ok && subnet.IP.Equal(ip) {
+				return nil
+			}
+		}
+		return fmt.Errorf("%w: health probes may only connect to this machine", ErrBlocked)
+	}}
+}

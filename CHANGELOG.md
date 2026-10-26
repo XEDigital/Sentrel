@@ -4,6 +4,28 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
+## [0.9.13] - 2026-10-26
+
+### Security
+
+- Prevent agents from injecting server-owned check metrics into another tenant's check history; validate metric identifiers and scope check history and beat queries to the owning tenant.
+- Confine backup restores to the data directory with `os.Root`, reject escaping archive paths, and use exclusive staging files to prevent existing symlink attacks.
+- Reject newlines in email addresses and strip subject control characters to prevent SMTP header injection. Keep alert HTML escaped.
+- Keep pending MFA verification sessions on their fixed deadline and refresh the browser cookie after successful verification.
+- Require authentication for `/metrics` by default. Existing explicit `metrics_auth: false` settings remain respected. **Migration:** configure a read-scoped API key for scrapers on installations without an explicit opt-out.
+- Bound history and pagination input before conversion, allocation or SQL queries; reject overflow in fail2ban counters. Restrict downloadable agent filenames to a fixed platform allowlist.
+- Verify certificates for remote CLI health checks. Confine local self-signed health probes to this machine and refuse redirects.
+- Remove identity-derived usernames from conflicting SSO identity logs.
+
+### Fixed
+
+- Negative vulnerability-list limits no longer cause a server error or bypass pagination bounds.
+- MFA sessions no longer retain the short browser-cookie expiry after successful verification.
+
+### Changed
+
+- Release package metadata defaults to the project's Apache-2.0 licence.
+
 ## [0.9.12] - 2026-10-24
 
 ### Security

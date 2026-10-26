@@ -448,10 +448,7 @@ func (a *App) apiAudit(c *Ctx) (any, error) {
 		q += ` AND id<?`
 		args = append(args, b)
 	}
-	limit := c.QInt("limit", 200)
-	if limit > 2000 {
-		limit = 2000
-	}
+	limit := c.queryLimit("limit", 200, 2000)
 	q += ` ORDER BY id DESC LIMIT ?`
 	args = append(args, limit)
 	out := []AuditEntry{}

@@ -29,7 +29,7 @@ GO_MODULE="${GO_MODULE:-sentrel}"              # module path in go.mod
 HOMEPAGE="${HOMEPAGE:-https://github.com/XEDigital/Sentrel}"
 DOCS_URL="${DOCS_URL:-$HOMEPAGE}"
 MAINTAINER="${MAINTAINER:-Sentrel maintainers <noreply@users.noreply.github.com>}"
-LICENSE="${LICENSE:-proprietary}"
+LICENSE="${LICENSE:-Apache-2.0}"
 NFPM_VERSION="${NFPM_VERSION:-v2.41.3}"
 # Install locations. The agent path is referenced by the sudoers rule.
 AGENT_PATH="${AGENT_PATH:-/usr/local/bin/$AGENT_BIN}"

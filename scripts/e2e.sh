@@ -206,7 +206,7 @@ SP=$(api POST /status-pages "{\"slug\":\"e2e-status\",\"title\":\"E2E\",\"public
 PUB=$(curl -s "$URL/api/v1/public/status/e2e-status")
 expect "public status page works without login" '.items[0].label == "API" and .overall != null' "$PUB"
 api DELETE "/status-pages/$(echo "$SP" | jq -r .id)" >/dev/null
-curl -s "$URL/metrics" | grep -q '^sentrel_cpu_usage_percent{' && ok "/metrics exposes host series" || bad "/metrics missing host series"
+curl -s -b "$JAR" "$URL/metrics" | grep -q '^sentrel_cpu_usage_percent{' && ok "/metrics exposes host series" || bad "/metrics missing host series"
 curl -s -b "$JAR" -o /tmp/e2e-backup.tgz "$URL/api/v1/server/backup"
 LIST=$(tar tzf /tmp/e2e-backup.tgz) # not piped into grep -q: SIGPIPE + pipefail
 grep -qx 'sentrel.db' <<<"$LIST" && grep -qx 'pki/ca.key' <<<"$LIST" && ok "backup contains database and PKI" || bad "backup incomplete"

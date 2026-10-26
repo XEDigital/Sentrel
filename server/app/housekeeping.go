@@ -257,16 +257,22 @@ func WriteBackup(ctx context.Context, d *db.DB, dataDir string, w io.Writer, wit
 // RestoreBackup unpacks a backup into an (empty or replaceable) data dir.
 // The server must not be running.
 func RestoreBackup(r io.Reader, dataDir string, force bool) error {
-	if _, err := os.Stat(filepath.Join(dataDir, "sentrel.db")); err == nil && !force {
-		return errors.New("data directory already contains a database; pass --force to overwrite")
-	}
 	if err := os.MkdirAll(dataDir, 0o750); err != nil {
 		return err
+	}
+	root, err := os.OpenRoot(dataDir)
+	if err != nil {
+		return err
+	}
+	defer root.Close()
+	if _, err := root.Stat("sentrel.db"); err == nil && !force {
+		return errors.New("data directory already contains a database; pass --force to overwrite")
 	}
 	gz, err := gzip.NewReader(r)
 	if err != nil {
 		return err
 	}
+	defer gz.Close()
 	tr := tar.NewReader(gz)
 	seenDB := false
 	for {
@@ -278,40 +284,44 @@ func RestoreBackup(r io.Reader, dataDir string, force bool) error {
 			return err
 		}
 		name := filepath.Clean(filepath.FromSlash(hdr.Name))
-		if strings.HasPrefix(name, "..") || filepath.IsAbs(name) {
+		if !filepath.IsLocal(name) || name == "." {
 			return fmt.Errorf("unsafe path in backup: %s", hdr.Name)
 		}
 		if hdr.Typeflag != tar.TypeReg {
 			continue
 		}
-		dst := filepath.Join(dataDir, name)
-		if err := os.MkdirAll(filepath.Dir(dst), 0o750); err != nil {
+		if hdr.Size > maxRestoreEntry {
+			return fmt.Errorf("backup entry %s is larger than %d bytes", name, int64(maxRestoreEntry))
+		}
+		if err := root.MkdirAll(filepath.Dir(name), 0o750); err != nil {
 			return err
 		}
 		mode := os.FileMode(0o640)
-		if strings.HasPrefix(name, "pki") {
+		if name == "pki" || strings.HasPrefix(name, "pki"+string(filepath.Separator)) {
 			mode = 0o600
 		}
-		f, err := os.OpenFile(dst+".restore", os.O_CREATE|os.O_WRONLY|os.O_TRUNC, mode)
+		// All operations stay inside the opened root, including when an existing
+		// directory is a symlink. Exclusive, random staging files prevent planted
+		// .restore links from being followed or inheriting permissive file modes.
+		tmp := name + ".restore-" + randomToken(12)
+		f, err := root.OpenFile(tmp, os.O_CREATE|os.O_EXCL|os.O_WRONLY, mode)
 		if err != nil {
 			return err
 		}
-		if hdr.Size > maxRestoreEntry {
-			f.Close()
-			return fmt.Errorf("backup entry %s is larger than %d bytes", name, int64(maxRestoreEntry))
+		_, copyErr := io.CopyN(f, tr, hdr.Size)
+		closeErr := f.Close()
+		if copyErr != nil || closeErr != nil {
+			_ = root.Remove(tmp)
+			return errors.Join(copyErr, closeErr)
 		}
-		if _, err := io.Copy(f, io.LimitReader(tr, maxRestoreEntry)); err != nil {
-			f.Close()
+		if err := root.Rename(tmp, name); err != nil {
+			_ = root.Remove(tmp)
 			return err
 		}
-		f.Close()
 		if name == "sentrel.db" {
 			seenDB = true
-			_ = os.Remove(dst + "-wal")
-			_ = os.Remove(dst + "-shm")
-		}
-		if err := os.Rename(dst+".restore", dst); err != nil {
-			return err
+			_ = root.Remove(name + "-wal")
+			_ = root.Remove(name + "-shm")
 		}
 	}
 	if !seenDB {

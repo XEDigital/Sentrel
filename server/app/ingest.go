@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"net"
+	"regexp"
 	"sentrel/internal/kernelpkg"
 	"sort"
 	"strings"
@@ -55,10 +56,17 @@ func (a *App) hostTenant(ctx context.Context, hostID int64) int64 {
 	return t
 }
 
+// Agent metric names must survive storage unchanged. The check_ namespace
+// belongs to server-generated probes, never to agent-supplied samples.
+var agentMetricName = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*$`)
+
 func (a *App) ingestMetrics(ctx context.Context, hostID int64, b *pb.MetricBatch) {
 	tenant := a.hostTenant(ctx, hostID)
 	samples := make([]metrics.Sample, 0, len(b.Samples))
 	for _, s := range b.Samples {
+		if s == nil || !agentMetricName.MatchString(s.Name) || strings.HasPrefix(s.Name, "check_") {
+			continue
+		}
 		samples = append(samples, metrics.Sample{Name: s.Name, Labels: s.Labels, Value: s.Value, TsMs: s.TsMs})
 	}
 	if err := a.ts.Append(hostID, tenant, samples); err != nil {

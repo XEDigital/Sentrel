@@ -469,7 +469,10 @@ func fail2banStatus(ctx context.Context) *pb.Fail2Ban {
 				continue
 			}
 			v = strings.TrimSpace(v)
-			n, _ := strconv.Atoi(v)
+			n, err := strconv.ParseUint(v, 10, 32)
+			if err != nil {
+				n = 0
+			}
 			switch {
 			case strings.Contains(l, "Currently failed"):
 				jail.CurrentlyFailed = uint32(n)

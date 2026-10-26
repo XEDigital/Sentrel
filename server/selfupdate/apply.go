@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"sentrel/internal/release"
+	"sentrel/server/netguard"
 )
 
 // ApplyConfig configures the privileged apply step. Only DataDir, BinPath,
@@ -479,7 +480,7 @@ func HTTPHealth(listen string) func(ctx context.Context, version string) error {
 		host = "127.0.0.1"
 	}
 	hostport := net.JoinHostPort(host, port)
-	cl := &http.Client{Timeout: 4 * time.Second, Transport: &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, DisableKeepAlives: true}}
+	cl := &http.Client{Timeout: 4 * time.Second, Transport: &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, DisableKeepAlives: true, DialContext: netguard.LocalDialer(4 * time.Second).DialContext}, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
 	return func(ctx context.Context, version string) error {
 		var last error
 		for {

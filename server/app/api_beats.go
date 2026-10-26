@@ -20,7 +20,7 @@ type hostBeat struct {
 // apiHostBeats returns one uptime percentage per day for every visible host,
 // oldest first, for the compact status bars in the host list.
 func (a *App) apiHostBeats(c *Ctx) (any, error) {
-	days := int(c.QInt("days", 30))
+	days := c.queryLimit("days", 30, 90)
 	if days <= 0 {
 		days = 30
 	}
@@ -81,7 +81,7 @@ type checkBeat struct {
 // apiCheckBeats returns the most recent results of every visible check,
 // oldest first, read from the time-series store.
 func (a *App) apiCheckBeats(c *Ctx) (any, error) {
-	limit := int(c.QInt("limit", 40))
+	limit := c.queryLimit("limit", 40, 100)
 	if limit <= 0 {
 		limit = 40
 	}
@@ -91,10 +91,11 @@ func (a *App) apiCheckBeats(c *Ctx) (any, error) {
 	tw, args := c.tenantWhere("k.tenant_id")
 	type chk struct {
 		ID       int64 `db:"id"`
+		TenantID int64 `db:"tenant_id"`
 		Interval int   `db:"interval_seconds"`
 	}
 	var checks []chk
-	if err := a.db.SelectContext(c.ctx(), &checks, `SELECT k.id, k.interval_seconds FROM checks k WHERE `+tw, args...); err != nil {
+	if err := a.db.SelectContext(c.ctx(), &checks, `SELECT k.id, k.tenant_id, k.interval_seconds FROM checks k WHERE `+tw, args...); err != nil {
 		return nil, err
 	}
 	out := make(map[string][]checkBeat, len(checks))
@@ -107,12 +108,12 @@ func (a *App) apiCheckBeats(c *Ctx) (any, error) {
 			step = 10 * time.Second
 		}
 		start := now.Add(-step * time.Duration(limit))
-		upS, err := a.ts.QueryRange(c.ctx(), fmt.Sprintf(`%scheck_up{check_id="%d"}`, metrics.Prefix, k.ID), start, now, step)
+		upS, err := a.ts.QueryRange(c.ctx(), fmt.Sprintf(`%scheck_up{check_id="%d",tenant_id="%d"}`, metrics.Prefix, k.ID, k.TenantID), start, now, step)
 		if err != nil || len(upS) == 0 {
 			continue
 		}
 		lat := map[int64]float64{}
-		if latS, err := a.ts.QueryRange(c.ctx(), fmt.Sprintf(`%scheck_latency_ms{check_id="%d"}`, metrics.Prefix, k.ID), start, now, step); err == nil && len(latS) > 0 {
+		if latS, err := a.ts.QueryRange(c.ctx(), fmt.Sprintf(`%scheck_latency_ms{check_id="%d",tenant_id="%d"}`, metrics.Prefix, k.ID, k.TenantID), start, now, step); err == nil && len(latS) > 0 {
 			for _, p := range latS[0].Points {
 				lat[int64(p[0])] = p[1]
 			}

@@ -116,10 +116,10 @@ func (s *Store) Append(hostID, tenantID int64, samples []Sample) error {
 		b := labels.NewScratchBuilder(len(smp.Labels) + 3)
 		b.Add(labels.MetricName, Prefix+sanitize(smp.Name))
 		for k, v := range smp.Labels {
-			if k == "host_id" || k == "tenant_id" || k == labels.MetricName {
+			if k == "" || k != sanitize(k) || k == "host_id" || k == "tenant_id" || k == labels.MetricName {
 				continue
 			}
-			b.Add(sanitize(k), v)
+			b.Add(k, v)
 		}
 		if hostID > 0 {
 			b.Add("host_id", hid)

@@ -122,7 +122,7 @@ scrape_configs:
 
 Series are named `sentrel_<metric>` (for example `sentrel_cpu_usage_percent`, `sentrel_mem_used_percent`, `sentrel_disk_used_percent{mount="/"}`, `sentrel_check_up{check_id="3",check_type="http"}`), carry `host_id`, `tenant_id` and a `host` label with the host name, and are exposed as gauges. Also exposed: `sentrel_server_info{version}`, `sentrel_server_agents_connected` (provider users only) and `sentrel_alerts_firing{severity}`. A tenant-bound key sees only its tenant's series.
 
-By default `/metrics` needs no authentication. Turn on `metrics_auth` ("Require an API key for /metrics" under Settings, Security) to require a key with read scope; the endpoint then answers 401 without one.
+By default `/metrics` requires authentication and answers 401 without it. Use an API key with read scope. An administrator can turn off `metrics_auth` ("Require an API key for /metrics" under Settings, Security) for an intentionally public or trusted-network scrape endpoint; explicit existing opt-outs are preserved.
 
 ### PromQL: `GET /api/v1/metrics/query`
 

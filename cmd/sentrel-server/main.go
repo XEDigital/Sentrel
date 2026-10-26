@@ -9,7 +9,9 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net"
 	"net/http"
+	neturl "net/url"
 	"os"
 	"os/signal"
 	"os/user"
@@ -25,6 +27,7 @@ import (
 	"sentrel/server/app"
 	"sentrel/server/authn"
 	"sentrel/server/db"
+	"sentrel/server/netguard"
 	"sentrel/server/selfupdate"
 )
 
@@ -239,7 +242,21 @@ func healthcheck(args []string) error {
 	fs := flag.NewFlagSet("healthcheck", flag.ExitOnError)
 	url := fs.String("url", "http://127.0.0.1:8080/healthz", "health URL")
 	fs.Parse(args)
-	cl := &http.Client{Timeout: 5 * time.Second, Transport: &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}}
+	u, err := neturl.Parse(*url)
+	if err != nil || u.Host == "" || (u.Scheme != "http" && u.Scheme != "https") {
+		return fmt.Errorf("invalid health URL")
+	}
+	// Only loopback health checks may accept a self-signed certificate. Remote
+	// URLs use normal chain and hostname verification, and redirects never move
+	// a local exception to a remote endpoint.
+	ip := net.ParseIP(u.Hostname())
+	local := u.Hostname() == "localhost" || (ip != nil && ip.IsLoopback())
+	tr := &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: local, MinVersion: tls.VersionTLS12}}
+	if local {
+		tr.DialContext = netguard.LocalDialer(5 * time.Second).DialContext
+	}
+	defer tr.CloseIdleConnections()
+	cl := &http.Client{Timeout: 5 * time.Second, Transport: tr, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
 	try := func(u string) error {
 		resp, err := cl.Get(u)
 		if err != nil {
@@ -251,7 +268,7 @@ func healthcheck(args []string) error {
 		}
 		return nil
 	}
-	err := try(*url)
+	err = try(*url)
 	if err != nil && strings.HasPrefix(*url, "http://") {
 		// The server may have switched to TLS on the same port.
 		if err2 := try("https://" + strings.TrimPrefix(*url, "http://")); err2 == nil {

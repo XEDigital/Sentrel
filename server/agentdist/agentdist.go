@@ -36,11 +36,16 @@ func (b *Binary) Open() (io.ReadCloser, error) { return b.open() }
 
 // FileName is the canonical file name for os/arch.
 func FileName(goos, goarch string) string {
-	n := "sentrel-agent-" + goos + "-" + goarch
-	if goos == "windows" {
-		n += ".exe"
+	switch goos + "/" + goarch {
+	case "linux/amd64":
+		return "sentrel-agent-linux-amd64"
+	case "linux/arm64":
+		return "sentrel-agent-linux-arm64"
+	case "windows/amd64":
+		return "sentrel-agent-windows-amd64.exe"
+	default:
+		return ""
 	}
-	return n
 }
 
 var (
@@ -53,12 +58,10 @@ var ErrNotFound = errors.New("agent binary not available for this platform")
 
 // Get returns the binary for os/arch, preferring dir when set.
 func Get(dir, goos, goarch string) (*Binary, error) {
-	switch goos + "/" + goarch {
-	case "linux/amd64", "linux/arm64", "windows/amd64":
-	default:
+	name := FileName(goos, goarch)
+	if name == "" {
 		return nil, fmt.Errorf("%w: %s/%s", ErrNotFound, goos, goarch)
 	}
-	name := FileName(goos, goarch)
 	key := dir + "|" + name
 	mu.Lock()
 	defer mu.Unlock()

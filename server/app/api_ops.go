@@ -29,10 +29,7 @@ func (a *App) apiListJobs(c *Ctx) (any, error) {
 		q += ` AND j.type=?`
 		args = append(args, t)
 	}
-	limit := c.QInt("limit", 200)
-	if limit > 1000 {
-		limit = 1000
-	}
+	limit := c.queryLimit("limit", 200, 1000)
 	q += ` ORDER BY j.created_at DESC LIMIT ?`
 	args = append(args, limit)
 	out := []Job{}
@@ -171,10 +168,7 @@ func (a *App) apiListFindings(c *Ctx) (any, error) {
 		q += ` AND (f.vuln_id LIKE ? OR f.package LIKE ?)`
 		args = append(args, "%"+s+"%", "%"+s+"%")
 	}
-	limit := c.QInt("limit", 500)
-	if limit > 5000 {
-		limit = 5000
-	}
+	limit := c.queryLimit("limit", 500, 5000)
 	q += ` GROUP BY f.host_id, f.vuln_id` + having + ` ORDER BY MAX(` + sevRank("f.severity") + `) DESC,
 		MAX(f.kev) DESC, MAX(f.cvss) DESC, f.vuln_id LIMIT ?`
 	skipInactive := c.Q("inactive") == "0"

@@ -207,7 +207,7 @@ func (s *authService) ssoUser(ctx context.Context, source string, id ssoIdentity
 			return nil, err
 		}
 		if n > 0 {
-			a.log.Warn("sso login refused: username already linked to a different identity", "username", username, "provider", id.Provider, "issuer", id.Issuer)
+			a.log.Warn("sso login refused: username already linked to a different identity", "provider", id.Provider, "issuer", id.Issuer)
 			return nil, &ssoDenied{"username already linked to a different identity"}
 		}
 		// One-time upgrade path for accounts created before identities were recorded.

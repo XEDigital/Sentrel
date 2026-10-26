@@ -87,7 +87,7 @@ type Principal struct {
 	// routeDef.PWOK). API keys of such a user are rejected outright.
 	MustChangePW bool
 	CSRF         string
-	perms      map[Perm]bool
+	perms        map[Perm]bool
 }
 
 func newPrincipal(role string, scopes []string) map[Perm]bool {
@@ -219,6 +219,18 @@ func (c *Ctx) QInt(n string, def int64) int64 {
 	return def
 }
 
+// queryLimit bounds an untrusted integer before any narrowing conversion or allocation.
+func (c *Ctx) queryLimit(name string, def, max int) int {
+	n, err := strconv.Atoi(c.Q(name))
+	if err != nil || n <= 0 {
+		return def
+	}
+	if n > max {
+		return max
+	}
+	return n
+}
+
 // tenantWhere returns a SQL condition restricting col to the caller's
 // visible tenants, honouring ?tenant_id= for provider users.
 func (c *Ctx) tenantWhere(col string) (string, []any) {
@@ -277,8 +289,8 @@ type routeDef struct {
 	// keys are refused whatever their scope. Used for account security.
 	Interactive bool
 	Req         any
-	Resp    any
-	Query   []string
+	Resp        any
+	Query       []string
 }
 
 type apiRouter struct {

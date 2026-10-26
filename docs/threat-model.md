@@ -35,7 +35,7 @@ Cannot, by design:
 - Run the setup wizard on a configured server: it needs the one-time setup token and is closed once the first administrator exists.
 
 Can:
-- Read the unauthenticated surface: `/healthz`, `/api/v1/public/info`, public status pages (and token-protected ones with the token), installer scripts and agent binaries. **`/metrics` is open by default** and exposes host names and metrics; enable `metrics_auth` to require an API key.
+- Read the unauthenticated surface: `/healthz`, `/api/v1/public/info`, public status pages (and token-protected ones with the token), installer scripts and agent binaries. `/metrics` requires authentication by default because it exposes host names and metrics. An explicitly saved `metrics_auth: false` still permits unauthenticated scraping.
 - Attempt denial of service. There is no general rate limiting beyond login lockout and registration limits. Put a proxy in front if you are exposed.
 - Observe and modify traffic in plain HTTP mode (below).
 
@@ -130,7 +130,7 @@ In self-signed mode the first agent connection pins the CA fingerprint given by 
 - **Plain HTTP mode** is supported and documented, and is unsafe on untrusted networks.
 - **Proxy and header trust.** `trust_proxy` and forward-auth are only as good as the proxy: if it fails to strip client-supplied identity headers, anyone can sign in as any user. Sentrel cannot detect that.
 - **LDAP and RADIUS** use the server as the intermediary; compromise of the server exposes the bind credentials.
-- **Open `/metrics` by default.**
+- **Explicitly public `/metrics`.** Installations with a saved `metrics_auth: false` still expose monitoring data without authentication; existing opt-outs are preserved.
 - **Third-party code.** The vulnerability matcher embeds Grype and its dependency tree; the vulnerability database is downloaded from Anchore. Sentrel does not verify the data beyond what Grype does.
 - **Single-process design.** Everything runs in one process with one data directory; there is no separation between the web tier and the signing key holder.
 - **AI-assisted code.** Much of the code was written with an AI assistant. It has been reviewed and tested, but treat it as you would any young codebase.

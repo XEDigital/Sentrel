@@ -152,7 +152,7 @@ func (s *authService) sessionPrincipal(ctx context.Context, token string) *Princ
 	if err != nil || a.principalBlocked(ctx, u) != nil {
 		return nil
 	}
-	if now-sr.LastSeenAt > 60 {
+	if sr.MFAPending == 0 && now-sr.LastSeenAt > 60 {
 		hours := a.settings.Security().SessionHours
 		if hours <= 0 {
 			hours = 12
@@ -266,18 +266,39 @@ func (s *authService) createSession(w http.ResponseWriter, r *http.Request, u *U
 	if err != nil {
 		return "", err
 	}
-	http.SetCookie(w, &http.Cookie{Name: sessionCookie, Value: tok, Path: "/", HttpOnly: true, Secure: a.isHTTPS(r),
-		SameSite: http.SameSiteLaxMode, Expires: time.Unix(exp, 0)})
+	s.setSessionCookie(w, r, tok, exp)
 	return csrf, nil
 }
 
-func (s *authService) upgradeSession(ctx context.Context, p *Principal, mfa int) error {
+func (s *authService) upgradeSession(c *Ctx, mfa int) error {
+	cookie, err := c.R.Cookie(sessionCookie)
+	if err != nil || hashToken(cookie.Value) != c.P.SessionID {
+		return unauthorized("session expired; sign in again")
+	}
 	hours := s.app.settings.Security().SessionHours
 	if hours <= 0 {
 		hours = 12
 	}
-	_, err := s.app.db.ExecContext(ctx, `UPDATE sessions SET mfa_pending=?, expires_at=? WHERE id_hash=?`, mfa, db.Now()+int64(hours)*3600, p.SessionID)
-	return err
+	exp := db.Now() + int64(hours)*3600
+	res, err := s.app.db.ExecContext(c.ctx(), `UPDATE sessions SET mfa_pending=?, expires_at=? WHERE id_hash=?`, mfa, exp, c.P.SessionID)
+	if err != nil {
+		return err
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if n != 1 {
+		return unauthorized("session expired; sign in again")
+	}
+	// The browser must receive the full session lifetime too, rather than
+	// retaining the ten-minute cookie used for the pending second factor.
+	s.setSessionCookie(c.W, c.R, cookie.Value, exp)
+	return nil
+}
+
+func (s *authService) setSessionCookie(w http.ResponseWriter, r *http.Request, token string, expires int64) {
+	http.SetCookie(w, &http.Cookie{Name: sessionCookie, Value: token, Path: "/", HttpOnly: true, Secure: s.app.isHTTPS(r), SameSite: http.SameSiteLaxMode, Expires: time.Unix(expires, 0)})
 }
 
 // needsMFA reports which second factors a user has.
@@ -616,7 +637,7 @@ func (s *authService) totpEnable(c *Ctx) (any, error) {
 		return nil, err
 	}
 	if c.P.MFAPending {
-		_ = s.upgradeSession(c.ctx(), c.P, 0)
+		_ = s.upgradeSession(c, 0)
 	}
 	c.auditT(u.TenantID, "user.totp_enabled", "user", itoa(u.ID), nil)
 	return map[string]any{"recovery_codes": codes}, nil
@@ -742,7 +763,7 @@ func (s *authService) mfaTOTP(c *Ctx) (any, error) {
 		return nil, unauthorized("invalid code")
 	}
 	s.failures.Reset(key)
-	if err := s.upgradeSession(c.ctx(), c.P, 0); err != nil {
+	if err := s.upgradeSession(c, 0); err != nil {
 		return nil, err
 	}
 	s.loginCompleted(c, u, method)
@@ -961,7 +982,7 @@ func (s *authService) passkeyRegisterFinish(c *Ctx) (any, error) {
 		return nil, err
 	}
 	if c.P.MFAPending {
-		_ = s.upgradeSession(c.ctx(), c.P, 0)
+		_ = s.upgradeSession(c, 0)
 	}
 	c.auditT(wu.u.TenantID, "user.passkey_added", "user", itoa(wu.u.ID), map[string]any{"name": name})
 	return map[string]bool{"ok": true}, nil
@@ -1016,7 +1037,7 @@ func (s *authService) passkeyMFAFinish(c *Ctx) (any, error) {
 		return nil, unauthorized("passkey verification failed")
 	}
 	s.touchCredential(c.ctx(), cred)
-	if err := s.upgradeSession(c.ctx(), c.P, 0); err != nil {
+	if err := s.upgradeSession(c, 0); err != nil {
 		return nil, err
 	}
 	s.loginCompleted(c, wu.u, "password+passkey")

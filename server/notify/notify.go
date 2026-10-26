@@ -544,6 +544,14 @@ func SendMail(ctx context.Context, s SMTP, to []string, subject, text, htmlBody 
 	if len(to) == 0 {
 		return errors.New("no recipients")
 	}
+	// Display names and recipients are copied into RFC 5322 headers below.
+	// Reject newlines before even connecting, including display-name injection
+	// that addrOnly would hide from net/smtp's envelope validation.
+	for _, value := range append([]string{s.From, s.Username}, to...) {
+		if strings.ContainsAny(value, "\r\n") {
+			return errors.New("invalid mail header: address contains a newline")
+		}
+	}
 	port := s.Port
 	if port == 0 {
 		port = 587
@@ -628,6 +636,14 @@ func addrOnly(s string) string {
 }
 
 func mimeHeader(s string) string {
+	// Alert subjects include monitored host names and other untrusted text.
+	// A subject must stay one header even when its text contains controls.
+	s = strings.Map(func(r rune) rune {
+		if r < 0x20 || r == 0x7f {
+			return ' '
+		}
+		return r
+	}, s)
 	for _, r := range s {
 		if r > 127 {
 			return "=?UTF-8?B?" + b64(s) + "?="

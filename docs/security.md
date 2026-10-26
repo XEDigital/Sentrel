@@ -121,7 +121,7 @@ Recovery codes are single use: spending one is an atomic compare-and-update, so 
 
 ## Sessions, CSRF and brute force
 
-- The session cookie `sentrel_session` is `HttpOnly`, `SameSite=Lax`, `Secure` over HTTPS; the token is stored hashed. Lifetime defaults to 12 hours (`session_hours`). Users can list sessions and revoke the others.
+- The session cookie `sentrel_session` is `HttpOnly`, `SameSite=Lax`, `Secure` over HTTPS; the token is stored hashed. Lifetime defaults to 12 hours (`session_hours`). Pending second-factor verification has a fixed ten-minute deadline that requests cannot extend; successful verification refreshes both the server-side expiry and the browser cookie. Users can list sessions and revoke the others.
 - Cookie-authenticated requests that change state must carry the `X-CSRF-Token` header (issued at login); requests authenticated with an API key (`Authorization: Bearer`) are not subject to CSRF checks.
 - Lockout: 8 failed logins (default) within 15 minutes for the same username and IP return HTTP 429; a per-IP ceiling of five times that applies across usernames. Counters follow the client IP, so configure `trust_proxy` correctly ([tls-and-proxies.md](tls-and-proxies.md)).
 - Responses carry `X-Content-Type-Options`, `Referrer-Policy`, `X-Frame-Options: DENY` (except public status pages, which may be embedded) and, over TLS, HSTS. The UI is served with a strict Content-Security-Policy.
@@ -158,14 +158,21 @@ Server-side checks (HTTP, TCP, TLS certificate, DNS with a custom resolver, ping
 
 ## Public surface
 
-Unauthenticated endpoints: `/healthz`, `/api/v1/public/info`, `/api/v1/public/status/{slug}` (public pages, or token-protected ones), the installer scripts under `/install/`, agent binaries and packages under `/download/agent/` (packages only from a fixed manifest), and the login/setup endpoints. `/metrics` is **open by default**; turn on **Settings, Security, "Require an API key for /metrics"** (`metrics_auth`) to require an API key with `read` scope. Setup is protected by the one-time setup token until the first administrator exists.
+Unauthenticated endpoints: `/healthz`, `/api/v1/public/info`, `/api/v1/public/status/{slug}` (public pages, or token-protected ones), the installer scripts under `/install/`, agent binaries and packages under `/download/agent/` (packages only from a fixed manifest), and the login/setup endpoints. `/metrics` requires authentication by default (`metrics_auth`): use an API key with `read` scope. An explicitly saved `metrics_auth: false` is preserved for installations that intentionally expose a trusted-network scrape endpoint. Setup is protected by the one-time setup token until the first administrator exists.
 
 ## Hardening checklist
 
 1. Use TLS (`selfsigned` or `acme`, or a proxy with `trust_proxy`); do not expose plain HTTP.
 2. Enable 2FA for admins; set `Require 2FA` to `admins` or `all`.
-3. Enable `metrics_auth` unless `/metrics` is only reachable from a trusted network.
+3. Keep `metrics_auth` enabled unless `/metrics` is only reachable from a trusted network. Existing installations with an explicit opt-out must enable it themselves.
 4. Leave remote actions off for hosts that do not need them.
 5. Docker group membership is root-equivalent, so the installer leaves it off by default; pass `--docker` only on hosts where container metrics are worth that risk.
 6. Protect and encrypt backups; keep `pki/` out of shared storage.
 7. Keep the server and (via self-update) the agents current. Server updates are Ed25519-signed and verified twice; see [Updating](operations.md#updating) and the [threat model](threat-model.md#server-self-update). Set `SENTREL_DISABLE_SELF_UPDATE=1` if you prefer to update only through your own tooling.
+
+## Audit hardening
+
+- Agent metric names must be valid identifiers and cannot use the server-owned `check_` namespace. Invalid label names are discarded rather than normalized into reserved identity labels. Check history and beat queries are scoped to the check's tenant, including for data recorded before this validation existed.
+- Backup restore uses `os.Root` for every directory, file and rename operation. Absolute and escaping archive paths are refused, existing symlinks cannot escape the data directory, and private keys are restored through exclusive staging files with mode `0600`.
+- Health checks never follow redirects. The CLI accepts self-signed TLS only for loopback URLs and confines those connections to the local machine; remote URLs retain normal certificate verification. The updater's self-signed health probes can only dial loopback or an address assigned to a local interface.
+- Email addresses containing CR or LF are refused before connecting to SMTP, and controls in subjects are replaced by spaces. HTML alert fields remain escaped. Notification destinations retain the tenant-aware guarded dialer; provider-owned destinations may intentionally target private services.
