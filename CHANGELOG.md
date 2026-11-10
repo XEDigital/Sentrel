@@ -4,6 +4,17 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
+## [0.9.14] - 2026-11-10
+
+### Security
+
+- Update `github.com/andybalholm/brotli` to 1.2.7, which fixes GO-2026-6888: a crafted compressed response could make an HTTP check allocate excessive memory.
+- `/healthz` no longer returns the database driver's error text to unauthenticated callers. It answers `database unavailable` with HTTP 503, and the detail goes to the server log.
+
+### Changed
+
+- Dependency updates: Grype 0.121.2, Syft 1.57.0, go-jose 4.1.9, gosnmp 1.47.0, Prometheus 0.316.0, gopsutil 4.26.10, gRPC 1.85.0, golang.org/x/net 0.62.0; TanStack Query 5.107.1, lucide-react 1.70.0, React Router 7.18.5, Vite 8.3.6, Vitest 5.1.0. The release workflow uses cosign-installer 4.1.3.
+
 ## [0.9.13] - 2026-10-26
 
 ### Security

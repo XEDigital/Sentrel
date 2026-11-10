@@ -385,7 +385,9 @@ func (s *httpServer) buildHandler() http.Handler {
 	r.Use(securityHeaders)
 	r.Get("/healthz", func(w http.ResponseWriter, _ *http.Request) {
 		if err := a.db.Ping(); err != nil {
-			http.Error(w, "db: "+err.Error(), 503)
+			// Unauthenticated: the driver's error text (paths, DSN) stays in the log.
+			a.log.Error("healthz: database ping failed", "err", err)
+			http.Error(w, "database unavailable", 503)
 			return
 		}
 		w.Write([]byte("ok\n"))
