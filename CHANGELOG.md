@@ -4,6 +4,28 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
+## [0.9.15] - 2026-11-11
+
+### Security
+
+- Built with Go 1.26.11, which fixes GO-2026-6859: a race in `net/http` request-size limiting could crash an HTTP/1 server.
+
+### Added
+
+- A next-step button on each alert that opens the page where its cause is shown or fixed: a vulnerability alert opens the host's vulnerabilities filtered to what is fixable now, update and reboot alerts open Packages, failed-login and port-scan alerts open Security, resource alerts open Metrics, and check alerts open the check.
+- The host list marks agents that are not on the version the server offers with an "agent update" badge, and has an "Agent version: Update available" filter. `GET /hosts` returns `agent_outdated`.
+- Acknowledge an alert as **expected**. The acknowledge dialog has a "This is expected" tick box for alerts that are normal, such as a machine that is only switched on when needed. The alert moves to a new **Expected** tab, is left out of the dashboard and host problem counts, and sends no notifications however often it fires and clears, until someone chooses **No longer expected**. API: `expected` on `POST /alerts/{id}/ack` and `POST /alerts/ack`, `GET /alerts?status=expected`, `alerts.expected` and `hosts.down_expected` on the dashboard, `down_expected` on hosts.
+
+### Changed
+
+- An acknowledgement now survives a short recovery. An acknowledged alert that clears and fires again within the flap window keeps its acknowledgement and note and does not notify again; before, it came back unacknowledged and notified. If it keeps returning, the flapping notification reports it once.
+- The dashboard's Acknowledge button opens the same dialog as the Alerts page instead of acknowledging at once.
+- The whole row in the alert list opens the alert, not only its title.
+
+### Removed
+
+- The **Resolve** button and `POST /alerts/{id}/resolve`. A manually resolved alert came straight back when its condition was still true. Alerts clear when their condition does, and are deleted with their host or check. To silence an alert that will not clear, acknowledge it, as expected if it should stay out of the active list.
+
 ## [0.9.14] - 2026-11-10
 
 ### Security

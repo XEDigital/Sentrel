@@ -106,9 +106,8 @@ func (a *App) registerRoutes(r *apiRouter) {
 	// Alerts.
 	r.add(routeDef{Method: GET, Path: "/alerts", Summary: "List alerts", Tag: "alerts", Perm: PermRead, Resp: []Alert{}, Query: []string{"status", "severity", "host_id", "limit"}}, a.apiListAlerts)
 	r.add(routeDef{Method: GET, Path: "/alerts/{id}", Summary: "Alert with event history", Tag: "alerts", Perm: PermRead}, a.apiGetAlert)
-	r.add(routeDef{Method: POST, Path: "/alerts/{id}/ack", Summary: "Acknowledge an alert", Tag: "alerts", Perm: PermAck, Req: ackReq{}}, a.apiAckAlert)
-	r.add(routeDef{Method: POST, Path: "/alerts/{id}/unack", Summary: "Remove acknowledgement", Tag: "alerts", Perm: PermAck}, a.apiUnackAlert)
-	r.add(routeDef{Method: POST, Path: "/alerts/{id}/resolve", Summary: "Force-resolve an alert", Tag: "alerts", Perm: PermAck}, a.apiResolveAlert)
+	r.add(routeDef{Method: POST, Path: "/alerts/{id}/ack", Summary: "Acknowledge an alert; with expected, also hide it and stop its notifications", Tag: "alerts", Perm: PermAck, Req: ackReq{}}, a.apiAckAlert)
+	r.add(routeDef{Method: POST, Path: "/alerts/{id}/unack", Summary: "Remove an acknowledgement or expected mark", Tag: "alerts", Perm: PermAck}, a.apiUnackAlert)
 	r.add(routeDef{Method: POST, Path: "/alerts/ack", Summary: "Acknowledge several alerts", Tag: "alerts", Perm: PermAck, Req: bulkAckReq{}}, a.apiBulkAck)
 	r.add(routeDef{Method: GET, Path: "/alert-events", Summary: "Alert event timeline", Tag: "alerts", Perm: PermRead, Resp: []AlertEvent{}, Query: []string{"host_id", "limit", "before"}}, a.apiAlertEvents)
 

@@ -574,17 +574,47 @@ func (a *App) apiListAlerts(c *Ctx) (any, error) {
 		}
 		return true
 	}
+	decorate := func(al *Alert) {
+		if al.HostID != nil {
+			al.HostName = names[*al.HostID]
+		}
+		if al.Status != "resolved" {
+			al.InMaintenance = a.alerts.inMaintenance(al)
+			al.SuppressedBy = a.dependencyReason(al)
+		}
+	}
+	if status == "expected" {
+		// Every alert marked as expected, whether it is firing right now or
+		// not, so the mark can always be found and removed.
+		tw, args := c.tenantWhere("tenant_id")
+		rows := []Alert{}
+		if err := a.db.SelectContext(c.ctx(), &rows, `SELECT * FROM alerts WHERE expected=1 AND `+tw+` ORDER BY (status='resolved'), started_at DESC LIMIT 2000`, args...); err != nil {
+			return nil, err
+		}
+		live := map[int64]Alert{}
+		for _, al := range a.alerts.Active() {
+			live[al.ID] = al
+		}
+		out := []Alert{}
+		for _, al := range rows {
+			if l, ok := live[al.ID]; ok {
+				al = l
+			}
+			if !keep(&al) {
+				continue
+			}
+			decorate(&al)
+			out = append(out, al)
+		}
+		return out, nil
+	}
 	out := []Alert{}
 	if status == "active" || status == "firing" || status == "pending" {
 		for _, al := range a.alerts.Active() {
-			if !keep(&al) || (status != "active" && al.Status != status) {
+			if !keep(&al) || al.Expected || (status != "active" && al.Status != status) {
 				continue
 			}
-			if al.HostID != nil {
-				al.HostName = names[*al.HostID]
-			}
-			al.InMaintenance = a.alerts.inMaintenance(&al)
-			al.SuppressedBy = a.dependencyReason(&al)
+			decorate(&al)
 			out = append(out, al)
 		}
 		sort.SliceStable(out, func(i, j int) bool {
@@ -649,6 +679,9 @@ func (a *App) apiGetAlert(c *Ctx) (any, error) {
 
 type ackReq struct {
 	Comment string `json:"comment"`
+	// Expected also hides the alert from the active list and stops all its
+	// notifications until the acknowledgement is removed.
+	Expected bool `json:"expected"`
 }
 
 func (a *App) alertTenant(c *Ctx, id int64) (int64, error) {
@@ -666,11 +699,11 @@ func (a *App) apiAckAlert(c *Ctx) (any, error) {
 	}
 	var req ackReq
 	_ = c.Decode(&req)
-	al, err := a.alerts.Ack(c.ctx(), c.ID(), c.P.Name, truncateStr(req.Comment, 1000))
+	al, err := a.alerts.Ack(c.ctx(), c.ID(), c.P.Name, truncateStr(req.Comment, 1000), req.Expected)
 	if err != nil {
 		return nil, badRequest("alert is not active")
 	}
-	c.auditT(t, "alert.acked", "alert", itoa(c.ID()), map[string]any{"comment": req.Comment, "title": al.Title})
+	c.auditT(t, "alert.acked", "alert", itoa(c.ID()), map[string]any{"comment": req.Comment, "expected": req.Expected, "title": al.Title})
 	return al, nil
 }
 
@@ -680,27 +713,16 @@ func (a *App) apiUnackAlert(c *Ctx) (any, error) {
 		return nil, err
 	}
 	if err := a.alerts.Unack(c.ctx(), c.ID(), c.P.Name); err != nil {
-		return nil, badRequest("alert is not active")
+		return nil, badRequest("alert is not active or marked as expected")
 	}
 	c.auditT(t, "alert.unacked", "alert", itoa(c.ID()), nil)
 	return nil, nil
 }
 
-func (a *App) apiResolveAlert(c *Ctx) (any, error) {
-	t, err := a.alertTenant(c, c.ID())
-	if err != nil {
-		return nil, err
-	}
-	if err := a.alerts.ResolveManual(c.ctx(), c.ID(), c.P.Name); err != nil {
-		return nil, badRequest("alert is not active")
-	}
-	c.auditT(t, "alert.resolved", "alert", itoa(c.ID()), nil)
-	return nil, nil
-}
-
 type bulkAckReq struct {
-	IDs     []int64 `json:"ids"`
-	Comment string  `json:"comment"`
+	IDs      []int64 `json:"ids"`
+	Comment  string  `json:"comment"`
+	Expected bool    `json:"expected"`
 }
 
 func (a *App) apiBulkAck(c *Ctx) (any, error) {
@@ -714,9 +736,9 @@ func (a *App) apiBulkAck(c *Ctx) (any, error) {
 		if err != nil {
 			continue
 		}
-		if _, err := a.alerts.Ack(c.ctx(), id, c.P.Name, req.Comment); err == nil {
+		if _, err := a.alerts.Ack(c.ctx(), id, c.P.Name, truncateStr(req.Comment, 1000), req.Expected); err == nil {
 			n++
-			c.auditT(t, "alert.acked", "alert", itoa(id), map[string]any{"comment": req.Comment})
+			c.auditT(t, "alert.acked", "alert", itoa(id), map[string]any{"comment": req.Comment, "expected": req.Expected})
 		}
 	}
 	return map[string]int{"acked": n}, nil

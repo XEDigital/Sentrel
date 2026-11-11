@@ -366,11 +366,14 @@ type dashboard struct {
 		Down        int `json:"down"`
 		Pending     int `json:"pending"`
 		Maintenance int `json:"maintenance"`
+		// Down with the alert marked as expected; not included in Down.
+		DownExpected int `json:"down_expected"`
 	} `json:"hosts"`
 	Alerts struct {
 		Critical int `json:"critical"`
 		Warning  int `json:"warning"`
 		Acked    int `json:"acked"`
+		Expected int `json:"expected"`
 	} `json:"alerts"`
 	Checks struct {
 		Total   int `json:"total"`
@@ -413,9 +416,15 @@ func (a *App) apiDashboard(c *Ctx) (any, error) {
 	}
 	var ids []int64
 	_ = a.db.SelectContext(ctx, &ids, `SELECT id FROM hosts WHERE `+tw, targs...)
+	expectedDown := a.alerts.expectedDown()
 	for _, id := range ids {
 		if a.maint.hostInWindow(id) {
 			d.Hosts.Maintenance++
+		}
+		// A host that is expected to be down is not counted as a problem.
+		if expectedDown[id] && d.Hosts.Down > 0 {
+			d.Hosts.Down--
+			d.Hosts.DownExpected++
 		}
 	}
 	rows = nil
@@ -438,6 +447,11 @@ func (a *App) apiDashboard(c *Ctx) (any, error) {
 			continue
 		}
 		if tw != "1=1" && len(targs) == 1 && al.TenantID != targs[0].(int64) {
+			continue
+		}
+		if al.Expected {
+			// Not a problem to act on: counted, but kept off the dashboard list.
+			d.Alerts.Expected++
 			continue
 		}
 		if al.AckedBy != "" {

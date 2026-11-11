@@ -138,7 +138,7 @@ func (a *App) handlePromMetrics(w http.ResponseWriter, r *http.Request) {
 	}
 	firing := map[string]int{}
 	for _, al := range a.alerts.Active() {
-		if al.Status == "firing" && (tenant == 0 || al.TenantID == tenant) {
+		if al.Status == "firing" && !al.Expected && (tenant == 0 || al.TenantID == tenant) {
 			firing[al.Severity]++
 		}
 	}

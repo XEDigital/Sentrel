@@ -249,7 +249,8 @@ export function FindingsTable({ hostId }: { hostId?: number }) {
   const qc = useQueryClient()
   const [sev, setSev] = useState('')
   const [status, setStatus] = useState('open')
-  const [fixable, setFixable] = useState(false)
+  // ?fixable=1 (the link from a vulnerability alert) opens on what can be fixed now.
+  const [fixable, setFixable] = useState(() => new URLSearchParams(window.location.search).get('fixable') === '1')
   const [kev, setKev] = useState(false)
   const [inactive, setInactive] = useState(true)
   const [removeKernel, setRemoveKernel] = useState<{ hostId: number; abi: string } | null>(null)

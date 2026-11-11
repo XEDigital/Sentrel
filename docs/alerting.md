@@ -14,7 +14,7 @@ Alerts come from four places: **thresholds** on metrics, **checks**, **host live
 - **firing**: notifies the matching channels. A move from warning to critical (or, for certificates, to a later expiry stage) is an escalation and notifies again.
 - **resolved**: after `resolve_count` consecutive OK evaluations (**Settings, Alerting**, default 1).
 - A threshold alert whose metric stops being reported while the host is still reporting (for example an unmounted disk) is resolved automatically after 15 minutes.
-- Alerts keep a timeline (fired, escalated, acked, silenced, notified, flapping, resolved), kept for `alert_history_days` (default 180).
+- Alerts keep a timeline (fired, escalated, acked, expected, silenced, notified, flapping, resolved), kept for `alert_history_days` (default 180).
 
 Severity is `warning` or `critical`. Channels choose a minimum severity.
 
@@ -107,7 +107,13 @@ To mute one metric on a single host without editing the rule chain, use the togg
 
 ## Acknowledgements
 
-Acknowledging a firing alert (with an optional comment) stops its repeat reminders and marks it handled in the UI; the alert still resolves automatically. Un-acknowledge, bulk acknowledge and force-resolve are available. Ack state clears if the alert fires again.
+**Acknowledge** is the one action on an alert. It takes an optional note, stops the alert's repeat reminders and marks it handled. There is no manual resolve: an alert clears when its condition does. When a host or check is deleted its alerts are deleted with it.
+
+- **If it comes back.** An acknowledged alert that clears and fires again within `flap_window_minutes` keeps its acknowledgement and note, and does not send a new "fired" notification. If it keeps returning it is marked flapping, which sends one notification (see [Flapping](#flapping)). Once it has been clear for longer than the window, the next fire is a new, unacknowledged alert.
+- **This is expected.** Tick this when acknowledging an alert that is normal for you, such as a machine that is only switched on when needed. The alert moves from the **Active** tab to the **Expected** tab, is left out of the dashboard and host problem counts (a down host shows as "down (expected)"), and sends no notifications at all, however often it fires and clears. It stays that way until someone chooses **No longer expected** on the alert or in the Expected tab, which also works while the alert is clear. Its timeline still records each fire and resolve.
+- **Undo.** **Unacknowledge** removes a plain acknowledgement, and reminders resume.
+
+Several alerts can be acknowledged at once from the Active tab. Over the API: `POST /api/v1/alerts/{id}/ack` with `{"comment":"…","expected":true}`, `POST /api/v1/alerts/{id}/unack`, and `GET /api/v1/alerts?status=expected`.
 
 ## Maintenance windows
 

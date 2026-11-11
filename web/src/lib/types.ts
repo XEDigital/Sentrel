@@ -120,6 +120,10 @@ export interface Host {
   tenant_name?: string
   alert_count: number
   alert_severity?: string
+  /** The server offers a different agent version than the one running. */
+  agent_outdated?: boolean
+  /** Down, with its alert marked as expected: shown as off, not as a problem. */
+  down_expected?: boolean
   upgrade_count: number
   security_count: number
   vuln_critical: number
@@ -294,6 +298,8 @@ export interface Alert {
   acked_by: string
   acked_at: number
   ack_comment: string
+  /** Acknowledged as expected: hidden from the active list, never notified. */
+  expected?: boolean
   flapping: boolean
   muted?: boolean
   last_notified_at: number

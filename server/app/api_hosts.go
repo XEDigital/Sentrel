@@ -109,13 +109,28 @@ func (a *App) decorateHosts(ctx context.Context, hosts []Host) {
 	}
 	alertsBy := map[int64][]Alert{}
 	for _, al := range a.alerts.Active() {
-		if al.Status == "firing" && al.HostID != nil {
+		if al.Status == "firing" && !al.Expected && al.HostID != nil {
 			alertsBy[*al.HostID] = append(alertsBy[*al.HostID], al)
 		}
 	}
+	expectedDown := a.alerts.expectedDown()
+	latestAgent := map[string]string{} // "os/arch" -> version this server offers
 	for i := range hosts {
 		h := &hosts[i]
 		a.resolveHost(h)
+		h.DownExpected = expectedDown[h.ID]
+		if h.Kind == "agent" && h.AgentVersion != "" && !h.Revoked {
+			hi := hostInfo(h)
+			k := hi.Os + "/" + hi.Arch
+			v, ok := latestAgent[k]
+			if !ok {
+				if b, err := a.agentBinary(hi.Os, hi.Arch); err == nil {
+					v = b.Version
+				}
+				latestAgent[k] = v
+			}
+			h.AgentOutdated = v != "" && v != h.AgentVersion
+		}
 		h.Parent = a.parentInfo(ctx, "host", h.ID)
 		if h.GroupID != nil {
 			h.GroupName = groups[*h.GroupID]

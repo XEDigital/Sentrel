@@ -56,7 +56,7 @@ func (a *App) cleanup(ctx context.Context) {
 		{`DELETE FROM sessions WHERE expires_at < ?`, []any{now.Unix()}},
 		{`DELETE FROM enrollment_tokens WHERE (used_at=0 AND expires_at < ?) OR (used_at>0 AND used_at < ?)`, []any{now.Unix() - day, now.Unix() - 30*day}},
 		{`DELETE FROM alert_events WHERE created_at < ?`, []any{now.Unix() - int64(r.AlertHistoryDays)*day}},
-		{`DELETE FROM alerts WHERE status='resolved' AND resolved_at>0 AND resolved_at < ?`, []any{now.Unix() - int64(r.AlertHistoryDays)*day}},
+		{`DELETE FROM alerts WHERE status='resolved' AND expected=0 AND resolved_at>0 AND resolved_at < ?`, []any{now.Unix() - int64(r.AlertHistoryDays)*day}},
 		{`DELETE FROM audit_log WHERE created_at < ?`, []any{now.Unix() - int64(r.AuditDays)*day}},
 		{`DELETE FROM jobs WHERE finished_at>0 AND finished_at < ?`, []any{now.Unix() - int64(r.JobHistoryDays)*day}},
 		{`DELETE FROM security_events WHERE window_end < ?`, []any{now.Unix() - int64(r.SecurityEventDays)*day}},

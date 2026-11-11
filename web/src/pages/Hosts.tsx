@@ -14,6 +14,7 @@ import { Badge, Button, Card, Checkbox, Empty, Input, Loading, PageHeader, Selec
 export function hostStatusLabel(h: Host): { label: string; tone: 'ok' | 'warn' | 'crit' | 'muted' | 'maint' } {
   if (h.revoked) return { label: 'revoked', tone: 'muted' }
   if (h.in_maintenance) return { label: 'maintenance', tone: 'maint' }
+  if (h.status === 'down' && h.down_expected) return { label: 'down (expected)', tone: 'muted' }
   if (h.status === 'down') return { label: 'down', tone: 'crit' }
   if (h.status === 'pending') return { label: 'pending', tone: 'muted' }
   if (h.alert_severity === 'critical') return { label: 'critical', tone: 'crit' }
@@ -34,7 +35,7 @@ const sortOptions: { id: string; label: string }[] = [
 
 const sorters: Record<string, (h: Host) => number | string> = {
   name: (h) => h.name.toLowerCase(),
-  status: (h) => -((h.status === 'down' ? 3 : h.alert_severity === 'critical' ? 2 : h.alert_severity === 'warning' ? 1 : 0) * 1000 - h.id / 1e6),
+  status: (h) => -((h.status === 'down' && !h.down_expected ? 3 : h.alert_severity === 'critical' ? 2 : h.alert_severity === 'warning' ? 1 : 0) * 1000 - h.id / 1e6),
   cpu: (h) => -(h.summary?.cpu ?? -1),
   memory: (h) => -(h.summary?.memory ?? -1),
   disk: (h) => -(h.summary?.disk ?? -1),
@@ -74,11 +75,12 @@ export function Hosts() {
   const tag = params.get('tag') || ''
   const [selected, setSelected] = useState<Set<number>>(new Set())
   const sortKey = sortOptions.some((o) => o.id === params.get('sort')) ? params.get('sort')! : 'status'
-  const [filtersOpen, setFiltersOpen] = useState(!!(status || kind || group || tag))
-  const filterCount = [status, kind, group, tag].filter(Boolean).length
+  const agent = params.get('agent') || ''
+  const [filtersOpen, setFiltersOpen] = useState(!!(status || kind || group || tag || agent))
+  const filterCount = [status, kind, group, tag, agent].filter(Boolean).length
   const clearFilters = () => {
     const p = new URLSearchParams(params)
-    for (const k of ['status', 'kind', 'group_id', 'tag', 'q']) p.delete(k)
+    for (const k of ['status', 'kind', 'group_id', 'tag', 'agent', 'q']) p.delete(k)
     setQ('')
     setSelected(new Set())
     setParams(p, { replace: true })
@@ -90,9 +92,9 @@ export function Hosts() {
 
   const filtered = useMemo(() => {
     const s = q.trim().toLowerCase()
-    return (hosts.data || []).filter((h) => !s || h.name.toLowerCase().includes(s) || h.address.toLowerCase().includes(s) ||
+    return (hosts.data || []).filter((h) => agent !== 'outdated' || h.agent_outdated).filter((h) => !s || h.name.toLowerCase().includes(s) || h.address.toLowerCase().includes(s) ||
       (h.tags || []).some((t) => t.toLowerCase().includes(s)) || (h.host_info?.platform || '').toLowerCase().includes(s))
-  }, [hosts.data, q])
+  }, [hosts.data, q, agent])
   const sorted = useMemo(() => {
     const g = sorters[sortKey] || sorters.status
     return [...filtered].sort((a, b) => {
@@ -158,6 +160,9 @@ export function Hosts() {
           <label className="space-y-1 text-xs text-muted">Host type<Select aria-label="Filter by host type" value={kind} onChange={(e) => { setSelected(new Set()); setParam('kind', e.target.value) }}>
             <option value="">Any type</option><option value="agent">Agent</option><option value="snmp">SNMP device</option><option value="target">Target</option>
           </Select></label>
+          <label className="space-y-1 text-xs text-muted">Agent version<Select aria-label="Filter by agent version" value={agent} onChange={(e) => { setSelected(new Set()); setParam('agent', e.target.value) }}>
+            <option value="">Any version</option><option value="outdated">Update available</option>
+          </Select></label>
           <label className="space-y-1 text-xs text-muted">Group<Select aria-label="Filter by group" value={group} onChange={(e) => { setSelected(new Set()); setParam('group_id', e.target.value) }}>
             <option value="">Any group</option>{groups.data?.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
           </Select></label>
@@ -207,8 +212,9 @@ function HostRow({ h, selected, onToggle, days }: { h: Host; selected: boolean; 
           <div className="truncate text-xs text-muted" title={`${h.address} · ${system}`}>
             {h.address}<span className="hidden sm:inline"> · {system}</span>
           </div>
-          {(h.group_name || !!h.tags?.length || (h.tenant_name && h.tenant_id !== 0)) && (
+          {(h.agent_outdated || h.group_name || !!h.tags?.length || (h.tenant_name && h.tenant_id !== 0)) && (
             <div className="mt-1 flex flex-wrap items-center gap-1">
+              {h.agent_outdated && <Badge tone="warn" title={`Agent ${h.agent_version} is not the version this server offers. Open the host to update it.`}>agent update</Badge>}
               {h.group_name && <Badge>{h.group_name}</Badge>}
               {(h.tags || []).slice(0, 3).map((t) => <Badge key={t} tone="info">{t}</Badge>)}
               {h.tenant_name && h.tenant_id !== 0 && <Badge tone="accent">{h.tenant_name}</Badge>}

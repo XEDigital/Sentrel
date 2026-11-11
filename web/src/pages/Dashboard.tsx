@@ -1,7 +1,8 @@
 import { Link, useNavigate } from 'react-router'
+import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Activity, ArrowRight, Bell, BellOff, Plus, Server, ShieldAlert, Wrench } from 'lucide-react'
-import { get, post } from '@/lib/api'
+import { get } from '@/lib/api'
 import { useAuth } from '@/lib/auth'
 import { ago, plural } from '@/lib/format'
 import type { Alert, AlertEvent, Check, Host } from '@/lib/types'
@@ -9,11 +10,12 @@ import { FIXABLE_TITLE, nf } from '@/lib/vulns'
 import { BeatBar, checkBeatsToBeats, hostBeatsToBeats, useCheckBeats, useHostBeats } from '@/components/BeatBar'
 import { useTenantFilter } from '@/components/Layout'
 import { AllClear, Badge, Button, Card, Empty, Loading, MutedBadge, PageHeader, SeverityBadge, Stat, StatusDot, StatusPill, cx, useToast } from '@/components/ui'
+import { AckDialog } from './Alerts'
 import { hostStatusLabel, MiniMeter } from './Hosts'
 
 interface Dash {
-  hosts: { total: number; up: number; down: number; pending: number; maintenance: number }
-  alerts: { critical: number; warning: number; acked: number }
+  hosts: { total: number; up: number; down: number; pending: number; maintenance: number; down_expected?: number }
+  alerts: { critical: number; warning: number; acked: number; expected?: number }
   checks: { total: number; up: number; down: number; warning: number }
   upgrades_pending: number
   security_updates: number
@@ -71,6 +73,7 @@ export function Dashboard() {
   const nav = useNavigate()
   const qc = useQueryClient()
   const toast = useToast()
+  const [acking, setAcking] = useState<Alert | null>(null)
   const d = useQuery({ queryKey: ['dashboard', tenant], queryFn: () => get<Dash>('/dashboard', { tenant_id: tenant ?? undefined }), refetchInterval: 30_000 })
   const hosts = useQuery({ queryKey: ['hosts', 'grid', tenant], queryFn: () => get<Host[]>('/hosts', { tenant_id: tenant ?? undefined }), refetchInterval: 30_000 })
   const checks = useQuery({ queryKey: ['checks', 'all', tenant], queryFn: () => get<Check[]>('/checks', { host_id: undefined, tenant_id: tenant ?? undefined }), refetchInterval: 30_000 })
@@ -82,23 +85,13 @@ export function Dashboard() {
   const v = x.vulnerabilities || {}
 
   const allHosts = hosts.data || []
-  const problemHosts = allHosts.filter((h) => !h.revoked && !h.in_maintenance && (h.status === 'down' || !!h.alert_severity))
+  const problemHosts = allHosts.filter((h) => !h.revoked && !h.in_maintenance && !(h.status === 'down' && h.down_expected) && (h.status === 'down' || !!h.alert_severity))
     .sort((a, b) => (b.status === 'down' ? 2 : b.alert_severity === 'critical' ? 1 : 0) - (a.status === 'down' ? 2 : a.alert_severity === 'critical' ? 1 : 0))
   const warnHosts = allHosts.filter((h) => !h.in_maintenance && h.status !== 'down' && !!h.alert_severity).length
   const problemChecks = (checks.data || []).filter((c) => c.enabled && (c.status === 'down' || c.status === 'warning'))
     .sort((a, b) => (b.status === 'down' ? 1 : 0) - (a.status === 'down' ? 1 : 0))
   const warnTotal = (hosts.data ? warnHosts : 0) + x.checks.warning
   const upHosts = hosts.data ? allHosts.filter((h) => h.status === 'up' && !h.alert_severity && !h.in_maintenance).length : x.hosts.up
-
-  const ack = async (a: Alert) => {
-    try {
-      await post(`/alerts/${a.id}/ack`, { comment: '' })
-      toast('Alert acknowledged')
-      qc.invalidateQueries({ queryKey: ['dashboard'] })
-    } catch (e) {
-      toast(String(e), 'crit')
-    }
-  }
 
   return (
     <div className="space-y-5">
@@ -110,7 +103,7 @@ export function Dashboard() {
 
       <div className={cx('grid grid-cols-2 gap-3 sm:gap-4', x.vuln_enabled ? 'sm:grid-cols-3' : 'sm:grid-cols-2')}>
         <div className="col-span-2 sm:col-span-full">
-          <HealthCard total={`${plural(x.hosts.total, 'host')} · ${plural(x.checks.total, 'check')}${x.hosts.pending ? ` · ${x.hosts.pending} pending` : ''}`} parts={[
+          <HealthCard total={`${plural(x.hosts.total, 'host')} · ${plural(x.checks.total, 'check')}${x.hosts.pending ? ` · ${x.hosts.pending} pending` : ''}${x.hosts.down_expected ? ` · ${x.hosts.down_expected} down (expected)` : ''}`} parts={[
             { tone: 'ok', value: upHosts + x.checks.up, title: `${plural(upHosts, 'host')} · ${plural(x.checks.up, 'check')}`, onClick: () => nav('/hosts?status=up') },
             { tone: 'crit', value: x.hosts.down + x.checks.down, title: `${plural(x.hosts.down, 'host')} · ${plural(x.checks.down, 'check')}`, onClick: () => nav(x.hosts.down ? '/hosts?status=down' : '/checks') },
             { tone: 'warn', value: warnTotal, title: `${plural(hosts.data ? warnHosts : 0, 'host')} · ${plural(x.checks.warning, 'check')}`, onClick: () => nav('/alerts') },
@@ -118,7 +111,7 @@ export function Dashboard() {
           ]} />
         </div>
         <Stat label="Active alerts" icon={<Bell />} value={x.alerts.critical + x.alerts.warning} tone={x.alerts.critical ? 'crit' : x.alerts.warning ? 'warn' : 'muted'}
-          sub={`${x.alerts.critical} critical · ${x.alerts.warning} warning${x.alerts.acked ? ` · ${x.alerts.acked} acknowledged` : ''}`} onClick={() => nav('/alerts')} />
+          sub={`${x.alerts.critical} critical · ${x.alerts.warning} warning${x.alerts.acked ? ` · ${x.alerts.acked} acknowledged` : ''}${x.alerts.expected ? ` · ${x.alerts.expected} expected` : ''}`} onClick={() => nav('/alerts')} />
         <Stat label="Updates pending" icon={<Wrench />} value={x.upgrades_pending} tone={x.security_updates ? 'warn' : 'muted'} sub={`${x.security_updates} security${x.reboot_required ? ` · ${x.reboot_required} need a reboot` : ''}`} onClick={() => nav('/hosts?sort=updates')} />
         {x.vuln_enabled && <div className="col-span-2 sm:col-span-1"><Stat label="Critical vulnerabilities" icon={<ShieldAlert />} value={nf(v.critical ?? 0)} tone={v.critical ? 'crit' : v.high ? 'warn' : 'muted'} title={FIXABLE_TITLE} sub={`${nf(v.high ?? 0)} high · ${nf(x.vulnerabilities_fixable ?? 0)} fixable`} onClick={() => nav('/vulnerabilities')} /></div>}
       </div>
@@ -142,7 +135,7 @@ export function Dashboard() {
                     {a.acked_by ? <Badge title={a.ack_comment}>acked by {a.acked_by}</Badge> : <SeverityBadge severity={a.severity} />}
                     <span className="w-16 text-right text-xs text-muted">{ago(a.fired_at)}</span>
                   </div>
-                  {!a.acked_by && can('ack') && <Button className="ml-auto shrink-0" size="sm" variant="ghost" icon={<BellOff className="size-3.5" />} onClick={() => ack(a)}>Acknowledge</Button>}
+                  {!a.acked_by && can('ack') && <Button className="ml-auto shrink-0" size="sm" variant="ghost" icon={<BellOff className="size-3.5" />} onClick={() => setAcking(a)}>Acknowledge</Button>}
                 </li>
               ))}
             </ul>
@@ -236,6 +229,7 @@ export function Dashboard() {
           )}
         </Card>
 
+      {acking && <AckDialog ids={[acking.id]} onClose={() => { setAcking(null); qc.invalidateQueries({ queryKey: ['dashboard'] }); qc.invalidateQueries({ queryKey: ['hosts'] }) }} onDone={(_n, expected) => toast(expected ? 'Alert marked as expected' : 'Alert acknowledged')} />}
     </div>
   )
 }
@@ -243,7 +237,7 @@ export function Dashboard() {
 function HostTile({ h }: { h: Host }) {
   const s = h.summary
   const st = hostStatusLabel(h)
-  const edge = h.in_maintenance ? 'bg-maint' : h.status === 'down' || h.alert_severity === 'critical' ? 'bg-crit-fill' : h.alert_severity === 'warning' ? 'bg-warn-fill' : h.status === 'up' ? 'bg-ok-fill' : 'bg-unknown-fill'
+  const edge = h.in_maintenance ? 'bg-maint' : h.status === 'down' && h.down_expected ? 'bg-unknown-fill' : h.status === 'down' || h.alert_severity === 'critical' ? 'bg-crit-fill' : h.alert_severity === 'warning' ? 'bg-warn-fill' : h.status === 'up' ? 'bg-ok-fill' : 'bg-unknown-fill'
   return (
     <Link to={`/hosts/${h.id}`} className="group relative block overflow-hidden rounded-md border border-line/70 bg-panel p-3.5 pl-4 transition-[transform,box-shadow] duration-150 hover:-translate-y-px hover:shadow-pop">
       <span className={cx('absolute inset-y-0 left-0 w-1', edge)} />

@@ -136,6 +136,9 @@ func containsInt(l []int64, v int64) bool {
 // enqueue routes an alert event to every matching channel.
 func (n *Notifier) enqueue(al Alert, event string) {
 	ctx := context.Background()
+	if al.Expected {
+		return // marked as expected: recorded in the timeline, never notified
+	}
 	if al.Muted {
 		n.app.alerts.event(ctx, &al, "silenced", "notifications disabled for this rule", "")
 		return

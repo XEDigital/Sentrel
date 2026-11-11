@@ -78,8 +78,11 @@ curl -s -H "Authorization: Bearer $KEY" -H 'Content-Type: application/json' \
   "scope": "host", "scope_id": 7, "metric": "disk", "label_match": "/data*",
   "warn": 90, "crit": 97, "for_count": 2}'
 
-# Acknowledge, then resolve
+# Acknowledge an alert; it clears by itself when the condition does
 curl -s -H "Authorization: Bearer $KEY" -H 'Content-Type: application/json' -X POST $HB/api/v1/alerts/42/ack -d '{"comment":"deploying a fix"}'
+
+# Acknowledge as expected: hidden from the active list and never notified until /unack
+curl -s -H "Authorization: Bearer $KEY" -H 'Content-Type: application/json' -X POST $HB/api/v1/alerts/43/ack -d '{"comment":"only on when needed","expected":true}'
 
 # Maintenance window for host 7 for two hours
 NOW=$(date +%s)

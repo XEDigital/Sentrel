@@ -194,6 +194,8 @@ type Host struct {
 	TenantName    string       `db:"-" json:"tenant_name,omitempty"`
 	AlertCount    int          `db:"-" json:"alert_count"`
 	AlertSeverity string       `db:"-" json:"alert_severity,omitempty"`
+	AgentOutdated bool         `db:"-" json:"agent_outdated,omitempty"` // this server offers a different agent version
+	DownExpected  bool         `db:"-" json:"down_expected,omitempty"` // down, and its alert is marked as expected
 	UpgradeCount  int          `db:"-" json:"upgrade_count"`
 	SecurityCount int          `db:"-" json:"security_count"`
 	VulnCritical  int          `db:"-" json:"vuln_critical"`
@@ -310,6 +312,7 @@ type Alert struct {
 	AckedBy        string   `db:"acked_by" json:"acked_by"`
 	AckedAt        int64    `db:"acked_at" json:"acked_at"`
 	AckComment     string   `db:"ack_comment" json:"ack_comment"`
+	Expected       bool     `db:"expected" json:"expected"` // hidden from the active list, never notified
 	Flapping       bool     `db:"flapping" json:"flapping"`
 	Transitions    IntList  `db:"transitions" json:"-"`
 	LastNotifiedAt int64    `db:"last_notified_at" json:"last_notified_at"`

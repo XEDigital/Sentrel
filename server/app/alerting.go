@@ -246,8 +246,10 @@ func (e *AlertEngine) apply(ctx context.Context, c condition) {
 		if cur.Status == "pending" {
 			delete(e.active, c.Key)
 			delete(e.okCount, c.Key)
-			_, _ = a.db.ExecContext(ctx, `DELETE FROM alerts WHERE id=? AND fired_at=0`, cur.ID)
-			_, _ = a.db.ExecContext(ctx, `UPDATE alerts SET status='resolved', pending_count=0 WHERE id=? AND fired_at<>0`, cur.ID)
+			// A row marked as expected is kept even if it never fired this time,
+			// so the mark survives.
+			_, _ = a.db.ExecContext(ctx, `DELETE FROM alerts WHERE id=? AND fired_at=0 AND expected=0`, cur.ID)
+			_, _ = a.db.ExecContext(ctx, `UPDATE alerts SET status='resolved', pending_count=0 WHERE id=?`, cur.ID)
 			return
 		}
 		e.okCount[c.Key]++
@@ -288,9 +290,16 @@ func (e *AlertEngine) apply(ctx context.Context, c condition) {
 			cur.ID = prev.ID
 			cur.Transitions = prev.Transitions
 			cur.Flapping = prev.Flapping
+			cur.Expected = prev.Expected
+			// An acknowledgement carries over when the alert comes back soon
+			// after clearing (within the flap window), and always while the
+			// alert is marked as expected.
+			if prev.AckedBy != "" && (prev.Expected || ackCarries(prev.ResolvedAt, now, al.FlapWindowMinutes)) {
+				cur.AckedBy, cur.AckedAt, cur.AckComment = prev.AckedBy, prev.AckedAt, prev.AckComment
+			}
 			_, err = a.db.ExecContext(ctx, `UPDATE alerts SET tenant_id=?, host_id=?, check_id=?, source=?, metric=?, labels=?, severity=?, status='pending', title=?, message=?,
-				value=?, threshold=?, pending_count=0, started_at=?, fired_at=0, resolved_at=0, last_eval_at=?, acked_by='', acked_at=0, ack_comment='', notify_count=0, last_notified_at=0, muted=? WHERE id=?`,
-				c.TenantID, c.HostID, c.CheckID, c.Source, c.Metric, c.Labels, c.Severity, c.Title, c.Message, c.Value, c.Threshold, now, now, c.Muted, cur.ID)
+				value=?, threshold=?, pending_count=0, started_at=?, fired_at=0, resolved_at=0, last_eval_at=?, acked_by=?, acked_at=?, ack_comment=?, notify_count=0, last_notified_at=0, muted=? WHERE id=?`,
+				c.TenantID, c.HostID, c.CheckID, c.Source, c.Metric, c.Labels, c.Severity, c.Title, c.Message, c.Value, c.Threshold, now, now, cur.AckedBy, cur.AckedAt, cur.AckComment, c.Muted, cur.ID)
 		} else if errors.Is(err, sql.ErrNoRows) {
 			var res sql.Result
 			res, err = a.db.ExecContext(ctx, `INSERT INTO alerts (tenant_id, host_id, check_id, key, source, metric, labels, severity, status, title, message, value, threshold,
@@ -326,14 +335,15 @@ func (e *AlertEngine) apply(ctx context.Context, c condition) {
 		if cur.PendingCount >= forCount {
 			cur.Status = "firing"
 			cur.FiredAt = now
-			cur.AckedBy, cur.AckedAt, cur.AckComment = "", 0, ""
 			cur.stage = c.Stage
 			cur.Transitions = pruneTransitions(append(cur.Transitions, now), now, al.FlapWindowMinutes)
 			e.checkFlapping(ctx, cur, now, al)
 			writeNeeded = true
 			e.event(ctx, cur, "fired", "", "")
 			a.maybeAutoDiskAnalysis(*cur)
-			if !cur.Flapping {
+			// A still-acknowledged alert that came back does not notify again;
+			// if it keeps returning, the flapping notice above reports it once.
+			if !cur.Flapping && cur.AckedBy == "" {
 				if why := e.suppression(cur); why != "" {
 					e.event(ctx, cur, "silenced", why, "")
 				} else {
@@ -383,6 +393,15 @@ func severityRank(s string) int {
 		return 1
 	}
 	return 0
+}
+
+// ackCarries reports whether an alert that resolved at resolvedAt and is back
+// at now returns soon enough to keep its acknowledgement.
+func ackCarries(resolvedAt, now int64, windowMin int) bool {
+	if windowMin <= 0 {
+		windowMin = 30
+	}
+	return resolvedAt > 0 && now-resolvedAt <= int64(windowMin)*60
 }
 
 func pruneTransitions(t IntList, now int64, windowMin int) IntList {
@@ -445,19 +464,28 @@ func (e *AlertEngine) event(ctx context.Context, al *Alert, ev, msg, actor strin
 	}
 }
 
-// Ack acknowledges a firing alert.
-func (e *AlertEngine) Ack(ctx context.Context, id int64, actor, comment string) (*Alert, error) {
+// Ack acknowledges an active alert. With expected set the alert is also
+// hidden from the active list and sends no notifications, across any number
+// of fires and resolves, until Unack.
+func (e *AlertEngine) Ack(ctx context.Context, id int64, actor, comment string, expected bool) (*Alert, error) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	now := db.Now()
 	for _, cur := range e.active {
 		if cur.ID == id {
-			cur.AckedBy, cur.AckedAt, cur.AckComment = actor, now, comment
-			_, err := e.app.db.ExecContext(ctx, `UPDATE alerts SET acked_by=?, acked_at=?, ack_comment=? WHERE id=?`, actor, now, comment, id)
+			cur.AckedBy, cur.AckedAt, cur.AckComment, cur.Expected = actor, now, comment, expected
+			_, err := e.app.db.ExecContext(ctx, `UPDATE alerts SET acked_by=?, acked_at=?, ack_comment=?, expected=? WHERE id=?`, actor, now, comment, expected, id)
 			if err != nil {
 				return nil, err
 			}
-			e.event(ctx, cur, "acked", comment, actor)
+			ev, msg := "acked", comment
+			if expected {
+				ev = "expected"
+				if msg == "" {
+					msg = "marked as expected"
+				}
+			}
+			e.event(ctx, cur, ev, msg, actor)
 			e.app.events.publish(Event{Type: "alert.changed", TenantID: cur.TenantID, ID: itoa(id)})
 			cp := *cur
 			return &cp, nil
@@ -466,37 +494,34 @@ func (e *AlertEngine) Ack(ctx context.Context, id int64, actor, comment string) 
 	return nil, errNotFound
 }
 
-// Unack removes an acknowledgement.
+// Unack removes an acknowledgement and any "expected" mark. An expected
+// alert can be un-marked while it is resolved.
 func (e *AlertEngine) Unack(ctx context.Context, id int64, actor string) error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
+	var al *Alert
 	for _, cur := range e.active {
 		if cur.ID == id {
-			cur.AckedBy, cur.AckedAt, cur.AckComment = "", 0, ""
-			_, err := e.app.db.ExecContext(ctx, `UPDATE alerts SET acked_by='', acked_at=0, ack_comment='' WHERE id=?`, id)
-			e.event(ctx, cur, "unacked", "", actor)
-			e.app.events.publish(Event{Type: "alert.changed", TenantID: cur.TenantID, ID: itoa(id)})
-			return err
+			al = cur
 		}
 	}
-	return errNotFound
-}
-
-// ResolveManual force-resolves an alert (e.g. a stale condition).
-func (e *AlertEngine) ResolveManual(ctx context.Context, id int64, actor string) error {
-	e.mu.Lock()
-	var found *Alert
-	for _, cur := range e.active {
-		if cur.ID == id {
-			found = cur
+	if al == nil {
+		var row Alert
+		if err := e.app.db.GetContext(ctx, &row, `SELECT * FROM alerts WHERE id=? AND expected=1`, id); err != nil {
+			return errNotFound
 		}
+		al = &row
 	}
-	e.mu.Unlock()
-	if found == nil {
-		return errNotFound
+	wasExpected := al.Expected
+	al.AckedBy, al.AckedAt, al.AckComment, al.Expected = "", 0, "", false
+	_, err := e.app.db.ExecContext(ctx, `UPDATE alerts SET acked_by='', acked_at=0, ack_comment='', expected=0 WHERE id=?`, id)
+	msg := "acknowledgement removed"
+	if wasExpected {
+		msg = "no longer expected"
 	}
-	e.forceResolve(ctx, found.Key, "manually resolved by "+actor, actor)
-	return nil
+	e.event(ctx, al, "unacked", msg, actor)
+	e.app.events.publish(Event{Type: "alert.changed", TenantID: al.TenantID, ID: itoa(id)})
+	return err
 }
 
 func (e *AlertEngine) forceResolve(ctx context.Context, key, msg, actor string) {
@@ -567,6 +592,20 @@ func (e *AlertEngine) forgetCheck(checkID int64) {
 		}
 	}
 	e.mu.Unlock()
+}
+
+// expectedDown lists the hosts whose "host is down" alert is firing and
+// marked as expected: down, but not a problem to act on.
+func (e *AlertEngine) expectedDown() map[int64]bool {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	out := map[int64]bool{}
+	for _, al := range e.active {
+		if al.Expected && al.Status == "firing" && al.Metric == "host_down" && al.HostID != nil {
+			out[*al.HostID] = true
+		}
+	}
+	return out
 }
 
 // Active returns copies of active alerts.
