@@ -158,3 +158,7 @@ curl -s -H "Authorization: Bearer $KEY" "$HB/api/v1/hosts/12/metrics/export?form
 ### Public status pages
 
 `GET /api/v1/public/status/{slug}` (add `?token=...` for token-protected pages) needs no authentication and returns only the labels and statuses chosen on the page. The UI route is `/status/{slug}`.
+
+A page can opt in to more. A status page has `icon` (`""`, `preset:<name>` or a `data:image/...` URL), `layout` (`list` or `wall`), `theme` (`auto`, `light` or `dark`) and `show_overview`; a host item has `metrics`, any of `cpu`, `memory`, `network`, `disk`. The public response then carries `metrics` on those items and an `overview` object. Each metric is `{key, value, points}` with `key` one of `cpu`, `memory`, `disk`, `net_rx`, `net_tx`, and `points` the last hour as `[unix, value]` pairs (percent, or bytes per second for network). `overview` has the up, total and expected counts for hosts and checks, and `charts`: one `{key, series}` per metric (`cpu`, `memory`, `network`) with a `{label, points}` line for every host.
+
+An item's `status` is `expected` when it is down and its alert is acknowledged as expected; such items do not affect `overall`.

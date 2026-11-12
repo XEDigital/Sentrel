@@ -608,6 +608,19 @@ func (e *AlertEngine) expectedDown() map[int64]bool {
 	return out
 }
 
+// expectedChecks returns the checks whose firing alert is marked as expected.
+func (e *AlertEngine) expectedChecks() map[int64]bool {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	out := map[int64]bool{}
+	for _, al := range e.active {
+		if al.Expected && al.Status == "firing" && al.CheckID != nil {
+			out[*al.CheckID] = true
+		}
+	}
+	return out
+}
+
 // Active returns copies of active alerts.
 func (e *AlertEngine) Active() []Alert {
 	e.mu.Lock()

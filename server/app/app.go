@@ -39,12 +39,13 @@ type Config struct {
 
 // App is the running server.
 type App struct {
-	cfg      Config
-	log      *slog.Logger
-	db       *db.DB
-	ca       *pki.CA
-	ts       *metrics.Store
-	settings *SettingsStore
+	cfg           Config
+	log           *slog.Logger
+	db            *db.DB
+	ca            *pki.CA
+	ts            *metrics.Store
+	statusMetrics statusMetricCache // short-lived cache of status page host metrics
+	settings      *SettingsStore
 
 	hub      *Hub
 	alerts   *AlertEngine

@@ -195,7 +195,7 @@ type Host struct {
 	AlertCount    int          `db:"-" json:"alert_count"`
 	AlertSeverity string       `db:"-" json:"alert_severity,omitempty"`
 	AgentOutdated bool         `db:"-" json:"agent_outdated,omitempty"` // this server offers a different agent version
-	DownExpected  bool         `db:"-" json:"down_expected,omitempty"` // down, and its alert is marked as expected
+	DownExpected  bool         `db:"-" json:"down_expected,omitempty"`  // down, and its alert is marked as expected
 	UpgradeCount  int          `db:"-" json:"upgrade_count"`
 	SecurityCount int          `db:"-" json:"security_count"`
 	VulnCritical  int          `db:"-" json:"vuln_critical"`
@@ -242,25 +242,25 @@ type AgentOptions struct {
 }
 
 type Check struct {
-	ID                  int64    `db:"id" json:"id"`
-	TenantID            int64    `db:"tenant_id" json:"tenant_id"`
-	HostID              *int64   `db:"host_id" json:"host_id"`
-	Name                string   `db:"name" json:"name"`
-	Type                string   `db:"type" json:"type"`
-	Target              string   `db:"target" json:"target"`
-	Config              JSON     `db:"config" json:"config"`
-	IntervalSeconds     int      `db:"interval_seconds" json:"interval_seconds"`
-	TimeoutSeconds      int      `db:"timeout_seconds" json:"timeout_seconds"`
-	FailureThreshold    int      `db:"failure_threshold" json:"failure_threshold"`
-	Severity            string   `db:"severity" json:"severity"`
-	Enabled             bool     `db:"enabled" json:"enabled"`
-	Status              string   `db:"status" json:"status"`
-	ConsecutiveFailures int      `db:"consecutive_failures" json:"consecutive_failures"`
-	LastMessage         string   `db:"last_message" json:"last_message"`
-	LastLatencyMs       float64  `db:"last_latency_ms" json:"last_latency_ms"`
-	LastCheckedAt       int64    `db:"last_checked_at" json:"last_checked_at"`
-	LastChangeAt        int64    `db:"last_change_at" json:"last_change_at"`
-	CreatedAt           int64    `db:"created_at" json:"created_at"`
+	ID                  int64   `db:"id" json:"id"`
+	TenantID            int64   `db:"tenant_id" json:"tenant_id"`
+	HostID              *int64  `db:"host_id" json:"host_id"`
+	Name                string  `db:"name" json:"name"`
+	Type                string  `db:"type" json:"type"`
+	Target              string  `db:"target" json:"target"`
+	Config              JSON    `db:"config" json:"config"`
+	IntervalSeconds     int     `db:"interval_seconds" json:"interval_seconds"`
+	TimeoutSeconds      int     `db:"timeout_seconds" json:"timeout_seconds"`
+	FailureThreshold    int     `db:"failure_threshold" json:"failure_threshold"`
+	Severity            string  `db:"severity" json:"severity"`
+	Enabled             bool    `db:"enabled" json:"enabled"`
+	Status              string  `db:"status" json:"status"`
+	ConsecutiveFailures int     `db:"consecutive_failures" json:"consecutive_failures"`
+	LastMessage         string  `db:"last_message" json:"last_message"`
+	LastLatencyMs       float64 `db:"last_latency_ms" json:"last_latency_ms"`
+	LastCheckedAt       int64   `db:"last_checked_at" json:"last_checked_at"`
+	LastChangeAt        int64   `db:"last_change_at" json:"last_change_at"`
+	CreatedAt           int64   `db:"created_at" json:"created_at"`
 	// Push checks: the URL token (only shown to users who can edit checks),
 	// its lookup hash and the last beat received.
 	PushToken     string     `db:"push_token" json:"push_token,omitempty"`
@@ -530,6 +530,10 @@ type StatusPage struct {
 	Items        JSON   `db:"items" json:"items"`
 	ShowHistory  bool   `db:"show_history" json:"show_history"`
 	Announcement string `db:"announcement" json:"announcement"`
+	Icon         string `db:"icon" json:"icon"`                   // "", "preset:<name>" or a data:image URL
+	Layout       string `db:"layout" json:"layout"`               // list, wall
+	ShowOverview bool   `db:"show_overview" json:"show_overview"` // combined graphs for the page's hosts
+	Theme        string `db:"theme" json:"theme"`                 // auto (the viewer's choice), light, dark
 	CreatedAt    int64  `db:"created_at" json:"created_at"`
 	UpdatedAt    int64  `db:"updated_at" json:"updated_at"`
 }
@@ -538,6 +542,8 @@ type StatusPageItem struct {
 	Type  string `json:"type"` // host, check
 	ID    int64  `json:"id"`
 	Label string `json:"label"`
+	// Metrics a host item shows on the page: cpu, memory, network, disk.
+	Metrics []string `json:"metrics,omitempty"`
 }
 
 type AuditEntry struct {

@@ -491,7 +491,11 @@ export interface StatusPageItem {
   type: 'host' | 'check'
   id: number
   label: string
+  /** Host items only: metrics shown on the page. */
+  metrics?: StatusMetricKind[]
 }
+
+export type StatusMetricKind = 'cpu' | 'memory' | 'network' | 'disk'
 
 export interface StatusPage {
   id: number
@@ -504,6 +508,12 @@ export interface StatusPage {
   items: StatusPageItem[] | null
   show_history: boolean
   announcement: string
+  /** '', 'preset:<name>' or a data:image URL. */
+  icon: string
+  layout: 'list' | 'wall'
+  show_overview: boolean
+  /** 'auto' follows the viewer's own theme. */
+  theme: 'auto' | 'light' | 'dark'
 }
 
 export interface APIKey {

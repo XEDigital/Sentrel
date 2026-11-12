@@ -461,6 +461,10 @@ type statusPageReq struct {
 	Items        []StatusPageItem `json:"items"`
 	ShowHistory  *bool            `json:"show_history"`
 	Announcement string           `json:"announcement"`
+	Icon         string           `json:"icon"`
+	Layout       string           `json:"layout"`
+	ShowOverview bool             `json:"show_overview"`
+	Theme        string           `json:"theme"`
 	RegenToken   bool             `json:"regenerate_token"`
 }
 
@@ -474,11 +478,35 @@ func (a *App) validateStatusPage(c *Ctx, req *statusPageReq) (int64, error) {
 	if strings.TrimSpace(req.Title) == "" {
 		return 0, badRequest("title is required")
 	}
+	if req.Layout == "" {
+		req.Layout = "list"
+	}
+	if req.Layout != "list" && req.Layout != "wall" {
+		return 0, badRequest("layout must be list or wall")
+	}
+	if req.Theme == "" {
+		req.Theme = "auto"
+	}
+	if req.Theme != "auto" && req.Theme != "light" && req.Theme != "dark" {
+		return 0, badRequest("theme must be auto, light or dark")
+	}
+	if err := validateStatusIcon(req.Icon); err != nil {
+		return 0, err
+	}
 	tenant, err := c.tenantFor(req.TenantID)
 	if err != nil {
 		return 0, err
 	}
 	for i, it := range req.Items {
+		if it.Type != "host" && len(it.Metrics) > 0 {
+			return 0, badRequest("item %d: only hosts can show metrics", i+1)
+		}
+		if req.Items[i].Metrics, err = cleanStatusMetrics(it.Metrics); err != nil {
+			return 0, err
+		}
+		if len(req.Items[i].Metrics) == 0 {
+			req.Items[i].Metrics = nil
+		}
 		switch it.Type {
 		case "host":
 			h, err := c.visibleHost(it.ID)
@@ -530,8 +558,9 @@ func (a *App) apiCreateStatusPage(c *Ctx) (any, error) {
 	if !pub {
 		tok = randomToken(18)
 	}
-	res, err := a.db.ExecContext(c.ctx(), `INSERT INTO status_pages (tenant_id, slug, title, description, public, access_token, items, show_history, announcement, created_at, updated_at)
-		VALUES (?,?,?,?,?,?,?,?,?,?,?)`, tenant, req.Slug, req.Title, req.Description, pub, tok, mustJSON(req.Items), boolOr(req.ShowHistory, true), req.Announcement, now, now)
+	res, err := a.db.ExecContext(c.ctx(), `INSERT INTO status_pages (tenant_id, slug, title, description, public, access_token, items, show_history, announcement, icon, layout, show_overview, theme, created_at, updated_at)
+		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, tenant, req.Slug, req.Title, req.Description, pub, tok, mustJSON(req.Items), boolOr(req.ShowHistory, true), req.Announcement,
+		req.Icon, req.Layout, req.ShowOverview, req.Theme, now, now)
 	if err != nil {
 		return nil, err
 	}
@@ -563,8 +592,8 @@ func (a *App) apiUpdateStatusPage(c *Ctx) (any, error) {
 	if pub {
 		tok = ""
 	}
-	_, err := a.db.ExecContext(c.ctx(), `UPDATE status_pages SET slug=?, title=?, description=?, public=?, access_token=?, items=?, show_history=?, announcement=?, updated_at=? WHERE id=?`,
-		req.Slug, req.Title, req.Description, pub, tok, mustJSON(req.Items), boolOr(req.ShowHistory, true), req.Announcement, db.Now(), sp.ID)
+	_, err := a.db.ExecContext(c.ctx(), `UPDATE status_pages SET slug=?, title=?, description=?, public=?, access_token=?, items=?, show_history=?, announcement=?, icon=?, layout=?, show_overview=?, theme=?, updated_at=? WHERE id=?`,
+		req.Slug, req.Title, req.Description, pub, tok, mustJSON(req.Items), boolOr(req.ShowHistory, true), req.Announcement, req.Icon, req.Layout, req.ShowOverview, req.Theme, db.Now(), sp.ID)
 	c.auditT(sp.TenantID, "status_page.updated", "status_page", itoa(sp.ID), map[string]any{"slug": req.Slug})
 	return nil, err
 }
@@ -582,13 +611,16 @@ func (a *App) apiDeleteStatusPage(c *Ctx) (any, error) {
 type publicItem struct {
 	Label     string      `json:"label"`
 	Type      string      `json:"type"`
-	Status    string      `json:"status"` // operational, degraded, down, maintenance, unknown
+	Status    string      `json:"status"` // operational, degraded, down, maintenance, expected, unknown
 	UptimePct float64     `json:"uptime_percent"`
 	Days      []uptimeDay `json:"days,omitempty"`
+	// Metrics is set only for host items that opted in.
+	Metrics []publicMetric `json:"metrics,omitempty"`
 }
 
-// apiPublicStatus serves status page data without authentication. It only
-// reveals labels and up/down state for the configured items.
+// apiPublicStatus serves status page data without authentication. It reveals
+// labels and up/down state for the configured items, plus host metrics where
+// the page was set up to show them.
 func (a *App) apiPublicStatus(c *Ctx) (any, error) {
 	var sp StatusPage
 	if err := a.db.GetContext(c.ctx(), &sp, `SELECT * FROM status_pages WHERE slug=?`, strings.ToLower(c.Param("slug"))); err != nil {
@@ -599,9 +631,22 @@ func (a *App) apiPublicStatus(c *Ctx) (any, error) {
 	}
 	var items []StatusPageItem
 	_ = json.Unmarshal(sp.Items, &items)
+	// Host metrics are loaded only when the page asks for them.
+	var metricHosts []int64
+	for _, it := range items {
+		if it.Type == "host" && (sp.ShowOverview || len(it.Metrics) > 0) {
+			metricHosts = append(metricHosts, it.ID)
+		}
+	}
+	series := a.statusHostSeries(c.ctx(), sp.TenantID, metricHosts)
+	ov := publicOverview{Charts: []publicChart{}}
+	var ovHosts []overviewHost
+	// A host or check that is down and acknowledged as expected is shown as
+	// such and does not count as an outage.
+	expHosts, expChecks := a.alerts.expectedDown(), a.alerts.expectedChecks()
 	out := []publicItem{}
 	overall := "operational"
-	rank := map[string]int{"operational": 0, "maintenance": 1, "unknown": 1, "degraded": 2, "down": 3}
+	rank := map[string]int{"operational": 0, "expected": 0, "maintenance": 1, "unknown": 1, "degraded": 2, "down": 3}
 	for _, it := range items {
 		pi := publicItem{Label: it.Label, Type: it.Type, Status: "unknown"}
 		switch it.Type {
@@ -619,8 +664,20 @@ func (a *App) apiPublicStatus(c *Ctx) (any, error) {
 			case "down":
 				pi.Status = "down"
 			}
+			if h.Status != "up" && expHosts[it.ID] {
+				pi.Status = "expected"
+				ov.HostsExpected++
+			}
 			if a.maint.hostInWindow(it.ID) {
 				pi.Status = "maintenance"
+			}
+			if len(it.Metrics) > 0 {
+				pi.Metrics = hostPublicMetrics(series[it.ID], it.Metrics)
+			}
+			ovHosts = append(ovHosts, overviewHost{ID: it.ID, Label: it.Label})
+			ov.HostsTotal++
+			if h.Status == "up" {
+				ov.HostsUp++
 			}
 		case "check":
 			var k struct {
@@ -639,8 +696,16 @@ func (a *App) apiPublicStatus(c *Ctx) (any, error) {
 			case "down":
 				pi.Status = "down"
 			}
+			if k.Status != "up" && expChecks[it.ID] {
+				pi.Status = "expected"
+				ov.ChecksExpected++
+			}
 			if k.HostID != nil && a.maint.hostInWindow(*k.HostID) {
 				pi.Status = "maintenance"
+			}
+			ov.ChecksTotal++
+			if k.Status == "up" {
+				ov.ChecksUp++
 			}
 		}
 		days, pct := a.uptimeDays(c.ctx(), it.Type, it.ID, 90)
@@ -656,6 +721,12 @@ func (a *App) apiPublicStatus(c *Ctx) (any, error) {
 	if overall == "unknown" {
 		overall = "operational"
 	}
-	return map[string]any{"title": sp.Title, "description": sp.Description, "announcement": sp.Announcement, "items": out,
-		"overall": overall, "branding": a.settings.Branding(sp.TenantID), "updated_at": time.Now().Unix()}, nil
+	resp := map[string]any{"title": sp.Title, "description": sp.Description, "announcement": sp.Announcement, "items": out,
+		"overall": overall, "branding": a.settings.Branding(sp.TenantID), "updated_at": time.Now().Unix(),
+		"icon": sp.Icon, "layout": sp.Layout, "theme": sp.Theme}
+	if sp.ShowOverview {
+		ov.Charts = overviewCharts(series, ovHosts)
+		resp["overview"] = ov
+	}
+	return resp, nil
 }

@@ -255,7 +255,7 @@ function DeleteCheck({ id, name, onDone }: { id: number; name: string; onDone: (
   )
 }
 
-export function UptimeBars({ days, total = 90 }: { days: { day: string; percent: number; up_seconds: number; down_seconds: number }[]; total?: number }) {
+export function UptimeBars({ days, total = 90, height = 32, fill }: { days: { day: string; percent: number; up_seconds: number; down_seconds: number }[]; total?: number; height?: number; fill?: boolean }) {
   const map = new Map(days.map((d) => [d.day, d]))
   const beats: Beat[] = Array.from({ length: total }, (_, i) => {
     const day = new Date(Date.now() - (total - 1 - i) * 86400_000).toISOString().slice(0, 10)
@@ -267,7 +267,7 @@ export function UptimeBars({ days, total = 90 }: { days: { day: string; percent:
       detail: p < 0 ? 'No data' : `${p.toFixed(2)}% uptime`,
     }
   })
-  return <BeatBar beats={beats} count={total} height={32} />
+  return <BeatBar beats={beats} count={total} height={height} fill={fill} />
 }
 
 export function CheckDetail() {

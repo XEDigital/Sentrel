@@ -4,6 +4,23 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
+## [0.9.17] - 2026-11-12
+
+### Changed
+
+- A host or check that is down and acknowledged as expected is shown on status pages as "Off (expected)" and no longer turns the page to an outage. `GET /public/status/{slug}` reports it with `status: "expected"`.
+
+### Added
+
+- Optional extras for status pages. An existing page is unchanged until you turn one on.
+  - **Host metrics.** A host on a status page can show any of CPU, memory, network and disk: ring gauges for CPU, memory and disk, and the last hour of network traffic.
+  - **Overview graphs.** Graphs of CPU, memory and network over the last hour with a line for every host on the page. Hovering a graph shows each host's value at that time. CPU and memory zoom to the range the hosts cover and network is logarithmic, so the lines spread out.
+  - **Wall display.** A full-width layout with a tile per item, a clock, and how many hosts and checks are up in the header, for a screen on the wall.
+  - **Theme.** A page can be fixed to light or dark, independent of the viewer's theme in the app. `?theme=dark` or `?theme=light` on a link overrides it.
+  - **Page icon.** Choose a built-in icon or upload an image in place of the Branding logo.
+  - **Add all hosts with all metrics** in the editor adds every host not yet on the page and turns every metric on; **Add all hosts** adds them without metrics, and **Add all checks** adds every check.
+  - Metrics and the overview are visible to anyone who can open the page. `GET /public/status/{slug}` returns them only for pages and items that opted in.
+
 ## [0.9.16] - 2026-11-12
 
 ### Security

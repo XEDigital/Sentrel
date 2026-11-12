@@ -28,7 +28,7 @@ const fill: Record<BeatStatus, string> = {
  * Beats are right-aligned (newest on the right); when `count` is larger than the
  * data, the left side is padded with empty slots.
  */
-export function BeatBar({ beats, count, height = 28, className }: { beats: Beat[]; count?: number; height?: number; className?: string }) {
+export function BeatBar({ beats, count, height = 28, className, fill: stretch }: { beats: Beat[]; count?: number; height?: number; className?: string; /** Stretch the beats to the full width instead of capping each at 10px. */ fill?: boolean }) {
   const [hover, setHover] = useState<number | null>(null)
   const n = count ?? beats.length
   const shown = beats.slice(-n)
@@ -41,7 +41,7 @@ export function BeatBar({ beats, count, height = 28, className }: { beats: Beat[
         {slots.map((b, i) => (
           <span key={i} onMouseEnter={() => setHover(i)}
             className={cx('min-w-[2px] flex-1 rounded-full transition-[transform,opacity] duration-100', fill[b?.status ?? 'none'], hover === i ? 'scale-y-110 opacity-100' : hover !== null ? 'opacity-80' : '')}
-            style={{ maxWidth: 10 }} />
+            style={stretch ? undefined : { maxWidth: 10 }} />
         ))}
       </div>
       {hover !== null && at && (
