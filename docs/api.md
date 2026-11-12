@@ -23,7 +23,7 @@ export KEY=sentrel_abcd1234_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 curl -s -H "Authorization: Bearer $KEY" $HB/api/v1/hosts?status=down
 ```
 
-A key acts as its owner, narrowed by its scopes. A key can never do more than its owner's role allows.
+A key acts as its owner, narrowed by its scopes. A key can never do more than its owner's role allows, and a scope the role cannot use is refused when the key is created.
 
 | Scope | Grants |
 |---|---|

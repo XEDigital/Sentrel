@@ -10,6 +10,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode"
 
 	"github.com/google/uuid"
 	"google.golang.org/grpc/codes"
@@ -123,8 +124,11 @@ func (h *Hub) Register(ctx context.Context, req *pb.RegisterRequest) (*pb.Regist
 	if name == "" {
 		name = req.Host.Hostname
 	}
+	// Both values come from the agent and are shown in the UI and in
+	// notifications, so keep them to what a host name and an address look like.
+	name = cleanHostName(name)
 	addr := ""
-	if len(req.Host.IpAddresses) > 0 {
+	if len(req.Host.IpAddresses) > 0 && net.ParseIP(req.Host.IpAddresses[0]) != nil {
 		addr = req.Host.IpAddresses[0]
 	}
 	var hostID int64
@@ -267,6 +271,8 @@ func (h *Hub) Connect(stream pb.AgentService_ConnectServer) error {
 		h.app.log.Warn("agent auth failed", "agent_id", hello.AgentId, "ip", ip, "err", err)
 		return status.Error(codes.Unauthenticated, err.Error())
 	}
+	// Authenticated: lift the pre-auth size limit and free the slot.
+	releaseGRPCGate(ctx)
 	a := h.app
 	cfg := a.agentConfig(host)
 	welcome := &pb.ServerMessage{Msg: &pb.ServerMessage_Welcome{Welcome: &pb.Welcome{
@@ -443,6 +449,23 @@ func (h *Hub) ConnectedCount() int {
 	return len(h.conns)
 }
 
+// ConnectedCountTenant counts live agent streams of one tenant; tenant 0
+// (the provider) sees all of them.
+func (h *Hub) ConnectedCountTenant(tenantID int64) int {
+	if tenantID == 0 {
+		return h.ConnectedCount()
+	}
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	n := 0
+	for _, c := range h.conns {
+		if c.tenantID == tenantID {
+			n++
+		}
+	}
+	return n
+}
+
 // rateLimiter is a fixed-window limiter keyed by string.
 type rateLimiter struct {
 	mu     sync.Mutex
@@ -508,4 +531,22 @@ func (r *rateLimiter) Reset(key string) {
 	r.mu.Lock()
 	delete(r.hits, key)
 	r.mu.Unlock()
+}
+
+// cleanHostName reduces an agent-reported host name to letters, digits and
+// "-", "." and "_", at most 253 characters.
+func cleanHostName(s string) string {
+	var b strings.Builder
+	for _, r := range s {
+		if b.Len() >= 253 {
+			break
+		}
+		if unicode.IsLetter(r) || unicode.IsDigit(r) || r == '-' || r == '.' || r == '_' {
+			b.WriteRune(r)
+		}
+	}
+	if b.Len() == 0 {
+		return "unnamed-host"
+	}
+	return b.String()
 }

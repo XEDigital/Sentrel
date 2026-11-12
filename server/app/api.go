@@ -11,6 +11,7 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -187,14 +188,31 @@ type Ctx struct {
 
 func (c *Ctx) ctx() context.Context { return c.R.Context() }
 
+// bodyReadTimeout is how long a client has to send a request body.
+var bodyReadTimeout = 60 * time.Second
+
 // Decode reads a JSON body into v.
 func (c *Ctx) Decode(v any) error {
+	// Bound how long a client may take to send the body, so a slow sender
+	// cannot hold a connection open indefinitely.
+	rc := http.NewResponseController(c.W)
+	timed := rc.SetReadDeadline(time.Now().Add(bodyReadTimeout)) == nil
 	dec := json.NewDecoder(io.LimitReader(c.R.Body, 16<<20))
 	if err := dec.Decode(v); err != nil {
 		if errors.Is(err, io.EOF) {
 			return badRequest("request body required")
 		}
 		return badRequest("invalid JSON: %v", err)
+	}
+	// The deadline is lifted only once the whole body has arrived. Otherwise
+	// it stays, because the server reads the rest of the body before replying.
+	if timed {
+		if _, err := io.Copy(io.Discard, io.LimitReader(c.R.Body, 256<<10)); err == nil {
+			var one [1]byte
+			if _, err := c.R.Body.Read(one[:]); err == io.EOF {
+				_ = rc.SetReadDeadline(time.Time{})
+			}
+		}
 	}
 	return nil
 }

@@ -24,15 +24,15 @@ var startedAt = time.Now()
 // --- users ---
 
 type userReq struct {
-	TenantID     int64  `json:"tenant_id"`
-	Username     string `json:"username"`
-	Email        string `json:"email"`
-	DisplayName  string `json:"display_name"`
-	Password     string `json:"password"`
-	Role         string `json:"role"`
-	AuthSource   string `json:"auth_source"`
-	Disabled     *bool  `json:"disabled"`
-	MustChangePW *bool  `json:"must_change_password"`
+	TenantID     int64   `json:"tenant_id"`
+	Username     string  `json:"username"`
+	Email        *string `json:"email"`
+	DisplayName  string  `json:"display_name"`
+	Password     string  `json:"password"`
+	Role         string  `json:"role"`
+	AuthSource   string  `json:"auth_source"`
+	Disabled     *bool   `json:"disabled"`
+	MustChangePW *bool   `json:"must_change_password"`
 }
 
 func (a *App) apiListUsers(c *Ctx) (any, error) {
@@ -89,7 +89,7 @@ func (a *App) apiCreateUser(c *Ctx) (any, error) {
 		}
 	}
 	res, err := a.db.ExecContext(c.ctx(), `INSERT INTO users (tenant_id, username, email, display_name, password_hash, role, auth_source, must_change_pw, created_at)
-		VALUES (?,?,?,?,?,?,?,?,?)`, tenant, req.Username, req.Email, firstNonEmpty(req.DisplayName, req.Username), hash, req.Role, src, boolOr(req.MustChangePW, false), db.Now())
+		VALUES (?,?,?,?,?,?,?,?,?)`, tenant, req.Username, strOr(req.Email, ""), firstNonEmpty(req.DisplayName, req.Username), hash, req.Role, src, boolOr(req.MustChangePW, false), db.Now())
 	if err != nil {
 		return nil, err
 	}
@@ -158,6 +158,11 @@ func (a *App) apiUpdateUser(c *Ctx) (any, error) {
 		}
 		disabled = *req.Disabled
 	}
+	// An omitted email keeps the stored one; an empty string clears it.
+	email := u.Email
+	if req.Email != nil {
+		email = *req.Email
+	}
 	mustChange := u.MustChangePW
 	if req.MustChangePW != nil {
 		mustChange = *req.MustChangePW
@@ -182,7 +187,7 @@ func (a *App) apiUpdateUser(c *Ctx) (any, error) {
 	}
 	defer func() { _ = tx.Rollback() }()
 	if _, err := tx.ExecContext(ctx, `UPDATE users SET email=?, display_name=?, role=?, disabled=?, must_change_pw=? WHERE id=?`,
-		req.Email, firstNonEmpty(req.DisplayName, u.DisplayName), role, disabled, mustChange, u.ID); err != nil {
+		email, firstNonEmpty(req.DisplayName, u.DisplayName), role, disabled, mustChange, u.ID); err != nil {
 		return nil, err
 	}
 	revoke := newHash != "" || disabled || role != u.Role
@@ -395,6 +400,18 @@ func (a *App) apiCreateKey(c *Ctx) (any, error) {
 	for _, s := range req.Scopes {
 		if _, ok := scopePerms[s]; !ok {
 			return nil, badRequest("unknown scope %q (read, write, jobs, admin)", s)
+		}
+		// A key never exceeds its owner's role, so refuse scopes the role
+		// cannot use instead of listing a permission the key does not have.
+		usable := s == "read"
+		for _, p := range scopePerms[s] {
+			if p != PermRead && c.P.Has(p) {
+				usable = true
+				break
+			}
+		}
+		if !usable {
+			return nil, badRequest("your role does not allow the %q scope", s)
 		}
 	}
 	var exp int64
@@ -792,23 +809,28 @@ func (a *App) apiPutBranding(c *Ctx) (any, error) {
 
 func (a *App) apiServerStatus(c *Ctx) (any, error) {
 	ctx := c.ctx()
+	// Counts cover only what the caller may see.
+	tw, targs := c.tenantWhere("tenant_id")
 	var hosts, agents int
-	_ = a.db.GetContext(ctx, &hosts, `SELECT COUNT(*) FROM hosts`)
-	_ = a.db.GetContext(ctx, &agents, `SELECT COUNT(*) FROM hosts WHERE kind='agent' AND revoked=0`)
-	dbSize := int64(0)
-	for _, suf := range []string{"", "-wal"} {
-		if fi, err := os.Stat(a.db.Path + suf); err == nil {
-			dbSize += fi.Size()
-		}
-	}
-	var m runtime.MemStats
-	runtime.ReadMemStats(&m)
+	_ = a.db.GetContext(ctx, &hosts, `SELECT COUNT(*) FROM hosts WHERE `+tw, targs...)
+	_ = a.db.GetContext(ctx, &agents, `SELECT COUNT(*) FROM hosts WHERE kind='agent' AND revoked=0 AND `+tw, targs...)
 	out := map[string]any{
-		"version": version.Version, "commit": version.Commit, "build_date": version.Date, "go": runtime.Version(),
-		"uptime_seconds": int(time.Since(startedAt).Seconds()), "agents_connected": a.hub.ConnectedCount(), "agents_total": agents, "hosts_total": hosts,
-		"tls_mode": a.srv.Mode(), "memory_bytes": m.Sys, "goroutines": runtime.NumGoroutine(),
+		"version": version.Version, "commit": version.Commit, "build_date": version.Date,
+		"uptime_seconds": int(time.Since(startedAt).Seconds()), "agents_connected": a.hub.ConnectedCountTenant(c.P.TenantID), "agents_total": agents, "hosts_total": hosts,
+		"tls_mode": a.srv.Mode(),
 	}
 	if c.P.IsProvider() {
+		dbSize := int64(0)
+		for _, suf := range []string{"", "-wal"} {
+			if fi, err := os.Stat(a.db.Path + suf); err == nil {
+				dbSize += fi.Size()
+			}
+		}
+		var m runtime.MemStats
+		runtime.ReadMemStats(&m)
+		out["go"] = runtime.Version()
+		out["memory_bytes"] = m.Sys
+		out["goroutines"] = runtime.NumGoroutine()
 		disk := diskUsage(a.cfg.DataDir)
 		out["data_dir"] = a.cfg.DataDir
 		out["db_bytes"] = dbSize

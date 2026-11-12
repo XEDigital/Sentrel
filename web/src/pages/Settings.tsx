@@ -486,9 +486,9 @@ function Server() {
     <div className="grid gap-4 xl:grid-cols-2">
       <Card title="Server" className="h-full">
         <KV items={[
-          ['Version', `${x.version} (${x.commit}, ${x.build_date})`], ['Go', x.go], ['Uptime', duration(x.uptime_seconds)],
+          ['Version', `${x.version} (${x.commit}, ${x.build_date})`], ['Go', x.go ?? '–'], ['Uptime', duration(x.uptime_seconds)],
           ['Agents connected', `${x.agents_connected} / ${x.agents_total}`], ['Hosts', x.hosts_total], ['TLS', x.tls_mode],
-          ['Memory', bytes(x.memory_bytes)], ['Goroutines', x.goroutines], ['Data directory', <span key="d" className="mono">{x.data_dir}</span>],
+          ['Memory', x.memory_bytes != null ? bytes(x.memory_bytes) : '–'], ['Goroutines', x.goroutines ?? '–'], ['Data directory', <span key="d" className="mono">{x.data_dir}</span>],
           ['Disk', x.disk ? `${bytes(x.disk.used_bytes)} used of ${bytes(x.disk.total_bytes)} (${bytes(x.disk.free_bytes)} free)` : '–'],
           ['CA fingerprint', <span key="f" className="mono break-all text-xs">{x.ca_fingerprint}</span>],
         ]} />

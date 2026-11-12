@@ -4,6 +4,26 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
+## [0.9.16] - 2026-11-12
+
+### Security
+
+- An unauthenticated client could exhaust the server's memory through the agent endpoint. The server accepted a message of up to 64 MB before the agent had authenticated, so a small number of connections could use several GB. A connection may now send at most 128 KB until it has authenticated, and unauthenticated connections are capped at 512 in total and 64 per source address. Enrolled agents are not affected and can still send large reports.
+- A request body must now arrive within 60 seconds. Before, a client could send a body arbitrarily slowly and hold its connection open.
+- `GET /server/status` showed tenant users the host and agent counts of the whole server, plus its memory use, goroutine count and Go version. Tenant users now get the counts for their own tenant only; the process details are for provider users.
+- Metric samples from an agent are limited to 20,000 per report, 16 labels per sample, and bounded name and label lengths. Samples over the limits are dropped.
+- The host name an agent reports at enrolment is reduced to letters, digits, `-`, `.` and `_`, and its address is kept only if it is an IP address.
+
+### Changed
+
+- The address-wide login limit no longer locks out everyone behind a shared address. An account that has logged in successfully from an address in the last 30 days is exempt from that address's limit and is held only to its own per-account limit. Other accounts are still blocked. The record of known logins is kept in memory and is cleared by a restart.
+- Creating an API key with a scope the owner's role cannot use now fails with HTTP 400. Such a key never had those permissions, but it was listed as if it did.
+
+### Fixed
+
+- `PUT /users/{id}` cleared the user's email when the request left `email` out. An omitted `email` now keeps the stored value; an empty string clears it.
+- `POST /auth/passkey/begin` returned HTTP 500 when the server URL is an IP address. It now returns HTTP 400 with an explanation: passkeys need a DNS name.
+
 ## [0.9.15] - 2026-11-11
 
 ### Security

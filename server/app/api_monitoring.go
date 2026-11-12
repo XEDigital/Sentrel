@@ -1211,3 +1211,10 @@ func (a *App) apiMetricNames(c *Ctx) (any, error) {
 	sort.Strings(names)
 	return names, nil
 }
+
+func strOr(p *string, def string) string {
+	if p == nil {
+		return def
+	}
+	return *p
+}

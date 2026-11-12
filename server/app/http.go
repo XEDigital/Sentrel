@@ -414,7 +414,7 @@ func (s *httpServer) buildHandler() http.Handler {
 	r.With(a.auth.middleware).Get("/metrics", a.handlePromMetrics)
 	r.NotFound(a.serveUI)
 
-	grpcH := s.grpc
+	grpcH := gateGRPC(s.grpc, &preAuthLimiter{})
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		if req.ProtoMajor == 2 && strings.HasPrefix(req.Header.Get("Content-Type"), "application/grpc") {
 			grpcH.ServeHTTP(w, req)

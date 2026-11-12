@@ -197,6 +197,7 @@ server:   NOT REACHABLE - <reason>
 |---|---|
 | `invalid or expired enrollment token` | token already used, expired or mistyped; create a new one |
 | `too many registration attempts` | more than 20 registrations per minute from one IP; wait |
+| `too many unauthenticated connections` | more than 64 agents from one address, or 512 in total, were connecting at the same moment; the agent retries on its own |
 | certificate or "pinned CA" errors | wrong server URL or TLS mode; in self-signed mode pass `--ca-fingerprint` |
 | `clock skew too large` | the signed hello is accepted within 5 minutes only; fix NTP |
 | `replayed hello`, `hello signature invalid` | duplicate agent running with the same identity, or a proxy mangling the stream |

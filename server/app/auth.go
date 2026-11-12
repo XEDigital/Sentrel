@@ -32,6 +32,7 @@ type authService struct {
 	app      *App
 	failures *rateLimiter // username|ip -> failed attempts
 	ipFails  *rateLimiter
+	known    *knownLogins // username|ip pairs that have logged in successfully
 
 	waMu    sync.Mutex
 	waSess  map[string]waPending
@@ -56,6 +57,7 @@ func newAuthService(a *App) *authService {
 		app:      a,
 		failures: newRateLimiter(1<<30, window),
 		ipFails:  newRateLimiter(1<<30, window),
+		known:    &knownLogins{},
 		waSess:   map[string]waPending{},
 		waCache:  map[string]*webauthn.WebAuthn{},
 	}
@@ -357,7 +359,12 @@ func (s *authService) login(c *Ctx) (any, error) {
 	if limit <= 0 {
 		limit = 8
 	}
-	if s.failures.Count(s.lockoutKey(req.Username, ip)) >= limit || s.ipFails.Count(ip) >= limit*5 {
+	// The address-wide limit stops password spraying. An account that has
+	// logged in from this address before is exempt from it, so one noisy
+	// client behind a shared address cannot lock everyone else out; such an
+	// account is still held to its own per-account limit.
+	key := s.lockoutKey(req.Username, ip)
+	if s.failures.Count(key) >= limit || (s.ipFails.Count(ip) >= limit*5 && !s.known.Has(key)) {
 		a.audit(c.ctx(), auditEntry{Actor: req.Username, Action: "auth.locked_out", IP: ip})
 		return nil, &apiError{Status: 429, Code: "locked_out", Msg: "too many failed attempts; try again later"}
 	}
@@ -372,7 +379,8 @@ func (s *authService) login(c *Ctx) (any, error) {
 		a.log.Warn("login backend error", "user", req.Username, "err", err)
 		return nil, unauthorized("invalid username or password")
 	}
-	s.failures.Reset(s.lockoutKey(req.Username, ip))
+	s.failures.Reset(key)
+	s.known.Add(key)
 	return s.finishPrimaryLogin(c, u)
 }
 
@@ -846,7 +854,8 @@ func (s *authService) webAuthn(r *http.Request) (*webauthn.WebAuthn, error) {
 	u, _ := url.Parse(origin)
 	w, err := webauthn.New(&webauthn.Config{RPDisplayName: s.issuer(), RPID: u.Hostname(), RPOrigins: []string{origin}})
 	if err != nil {
-		return nil, err
+		// Typically an origin passkeys cannot use, such as a bare IP address.
+		return nil, badRequest("passkeys are not available for %s; the server URL must be a DNS name", u.Hostname())
 	}
 	// Bounded LRU: with no server URL the origin comes from the request, so
 	// the cache must not grow with attacker-chosen Host values.
@@ -1099,4 +1108,43 @@ func (s *authService) passkeyLoginFinish(c *Ctx) (any, error) {
 	}
 	s.loginCompleted(c, found.u, "passkey")
 	return loginResp{CSRF: csrf, User: found.u}, nil
+}
+
+// knownLogins remembers which username|address pairs logged in successfully
+// in the last 30 days. It is in memory only, like the failure counters.
+type knownLogins struct {
+	mu sync.Mutex
+	m  map[string]time.Time
+}
+
+const (
+	knownLoginTTL = 30 * 24 * time.Hour
+	knownLoginMax = 10000
+)
+
+func (k *knownLogins) Add(key string) {
+	k.mu.Lock()
+	defer k.mu.Unlock()
+	if k.m == nil {
+		k.m = map[string]time.Time{}
+	}
+	if len(k.m) >= knownLoginMax {
+		now := time.Now()
+		for e, t := range k.m {
+			if now.Sub(t) > knownLoginTTL {
+				delete(k.m, e)
+			}
+		}
+		if len(k.m) >= knownLoginMax {
+			k.m = map[string]time.Time{}
+		}
+	}
+	k.m[key] = time.Now()
+}
+
+func (k *knownLogins) Has(key string) bool {
+	k.mu.Lock()
+	defer k.mu.Unlock()
+	t, ok := k.m[key]
+	return ok && time.Since(t) <= knownLoginTTL
 }

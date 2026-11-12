@@ -60,11 +60,38 @@ func (a *App) hostTenant(ctx context.Context, hostID int64) int64 {
 // belongs to server-generated probes, never to agent-supplied samples.
 var agentMetricName = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*$`)
 
+// Bounds on what one agent may send, so a misbehaving or hostile agent cannot
+// grow metric storage without limit.
+const (
+	maxBatchSamples  = 20000
+	maxMetricNameLen = 128
+	maxSampleLabels  = 16
+	maxLabelNameLen  = 64
+	maxLabelValueLen = 1024
+)
+
+func labelsWithinLimits(l map[string]string) bool {
+	if len(l) > maxSampleLabels {
+		return false
+	}
+	for k, v := range l {
+		if len(k) > maxLabelNameLen || len(v) > maxLabelValueLen {
+			return false
+		}
+	}
+	return true
+}
+
 func (a *App) ingestMetrics(ctx context.Context, hostID int64, b *pb.MetricBatch) {
 	tenant := a.hostTenant(ctx, hostID)
 	samples := make([]metrics.Sample, 0, len(b.Samples))
 	for _, s := range b.Samples {
-		if s == nil || !agentMetricName.MatchString(s.Name) || strings.HasPrefix(s.Name, "check_") {
+		if len(samples) >= maxBatchSamples {
+			a.log.Warn("metric batch truncated", "host_id", hostID, "samples", len(b.Samples))
+			break
+		}
+		if s == nil || !agentMetricName.MatchString(s.Name) || len(s.Name) > maxMetricNameLen ||
+			strings.HasPrefix(s.Name, "check_") || !labelsWithinLimits(s.Labels) {
 			continue
 		}
 		samples = append(samples, metrics.Sample{Name: s.Name, Labels: s.Labels, Value: s.Value, TsMs: s.TsMs})

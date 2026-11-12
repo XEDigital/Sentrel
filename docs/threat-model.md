@@ -36,7 +36,7 @@ Cannot, by design:
 
 Can:
 - Read the unauthenticated surface: `/healthz`, `/api/v1/public/info`, public status pages (and token-protected ones with the token), installer scripts and agent binaries. `/metrics` requires authentication by default because it exposes host names and metrics. An explicitly saved `metrics_auth: false` still permits unauthenticated scraping.
-- Attempt denial of service. There is no general rate limiting beyond login lockout and registration limits. Put a proxy in front if you are exposed.
+- Attempt denial of service. There is no general rate limiting beyond login lockout, registration limits, a request-body timeout and limits on unauthenticated agent connections (128 KB each, 512 in total, 64 per address). Put a proxy in front if you are exposed.
 - Observe and modify traffic in plain HTTP mode (below).
 
 ### 2. Malicious tenant user (authenticated as `tenant_admin` or `tenant_viewer`)
