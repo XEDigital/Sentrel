@@ -21,8 +21,9 @@ How this list was produced
 
 Summary of findings
 -------------------
-No GPL, AGPL, LGPL, SSPL or other strong-copyleft licence was found in the
-Go packages linked into the binaries or in the production npm dependencies.
+The Go packages linked into the binaries and production npm dependencies
+are used under permissive licences or the accepted MPL-2.0 terms below.
+For dual-licensed dependencies, Sentrel selects the option documented here.
 
 Weak (file-level) copyleft: Mozilla Public License 2.0 (MPL-2.0)
   MPL-2.0 is accepted for this project. It requires that modifications to the
@@ -40,7 +41,7 @@ Weak (file-level) copyleft: Mozilla Public License 2.0 (MPL-2.0)
       https://github.com/hashicorp/errwrap
   github.com/hashicorp/go-cleanhttp v0.5.2
       https://github.com/hashicorp/go-cleanhttp
-  github.com/hashicorp/go-getter v1.8.9
+  github.com/hashicorp/go-getter v1.8.10
       https://github.com/hashicorp/go-getter
   github.com/hashicorp/go-multierror v1.1.1
       https://github.com/hashicorp/go-multierror
@@ -56,11 +57,22 @@ Weak (file-level) copyleft: Mozilla Public License 2.0 (MPL-2.0)
   Build-time only (not distributed): lightningcss 1.32.0 / 1.33.0 and its
   platform binaries (MPL-2.0), used by the Tailwind CSS / Vite build in web/.
 
-Unclassified by the scanner, verified manually from the licence text
+Scanner results reviewed manually against the upstream licence text
   github.com/xi2/xz v0.0.0-20171230120015-48954b6210f8
       Public domain ("put into the public domain", per its LICENSE file).
   modernc.org/mathutil v1.7.1
       BSD-3-Clause (LICENSE file text checked).
+
+  github.com/deitch/magic v1.0.0
+      Apache-2.0 (its LICENSE contains the Apache notice).
+      https://github.com/deitch/magic/blob/v1.0.0/LICENSE
+  github.com/in-toto/attestation v1.2.0 (go/v1 package)
+      Apache-2.0 (the repository-level LICENSE applies to the Go package).
+      https://github.com/in-toto/attestation/blob/v1.2.0/LICENSE
+  github.com/spdx/tools-golang v0.6.0-rc4
+      Apache-2.0 is the option selected for Sentrel from its
+      Apache-2.0 OR GPL-2.0-or-later dual licence.
+      https://github.com/spdx/tools-golang/blob/v0.6.0-rc4/LICENSE.code
 
 Not listed because they are Sentrel's own packages: every package under the
 Go module "sentrel" (Apache-2.0). web/package.json has no "license" field,
@@ -72,8 +84,8 @@ Principal components
 Direct Go dependencies (go.mod):
   github.com/Microsoft/go-winio v0.6.4                MIT
   github.com/anchore/clio v0.1.2                      Apache-2.0
-  github.com/anchore/grype v0.121.2                   Apache-2.0   (vulnerability matcher, embedded as a library)
-  github.com/anchore/syft v1.57.0                     Apache-2.0
+  github.com/anchore/grype v0.122.1                   Apache-2.0   (vulnerability matcher, embedded as a library)
+  github.com/anchore/syft v1.57.2                     Apache-2.0
   github.com/expr-lang/expr v1.17.8                   MIT
   github.com/glebarez/go-sqlite v1.23.0               BSD-3-Clause (pure-Go SQLite driver; embeds modernc.org/sqlite)
   github.com/go-chi/chi/v5 v5.5.0                     MIT
@@ -85,13 +97,13 @@ Direct Go dependencies (go.mod):
   github.com/jmoiron/sqlx v1.4.0                      MIT
   github.com/kardianos/service v1.3.0                 Zlib
   github.com/pquerna/otp v1.5.0                       Apache-2.0
-  github.com/pressly/goose/v3 v3.29.0                 MIT
+  github.com/pressly/goose/v3 v3.30.1                 MIT
   github.com/prometheus-community/pro-bing v0.9.1     MIT
-  github.com/prometheus/common v0.73.1                Apache-2.0
+  github.com/prometheus/common v0.74.0                Apache-2.0
   github.com/prometheus/prometheus v0.316.0           Apache-2.0   (embedded TSDB and PromQL engine)
   github.com/shirou/gopsutil/v4 v4.26.10              BSD-3-Clause
-  golang.org/x/crypto v0.58.0                         BSD-3-Clause
-  golang.org/x/net v0.62.0                            BSD-3-Clause
+  golang.org/x/crypto v0.59.0                         BSD-3-Clause
+  golang.org/x/net v0.63.0                            BSD-3-Clause
   golang.org/x/sys v0.50.0                            BSD-3-Clause
   google.golang.org/grpc v1.85.0                      Apache-2.0
   google.golang.org/protobuf v1.36.12                 BSD-3-Clause
@@ -137,14 +149,13 @@ cloud.google.com/go/internal                                                v0.1
 cloud.google.com/go/monitoring                                              v1.30.0                                                    Apache-2.0
 cloud.google.com/go/storage                                                 v1.68.0                                                    Apache-2.0
 dario.cat/mergo                                                             v1.0.2                                                     BSD-3-Clause
-github.com/Azure/azure-sdk-for-go/sdk/azcore                                v1.23.3                                                    MIT
+github.com/Azure/azure-sdk-for-go/sdk/azcore                                v1.24.0                                                    MIT
 github.com/Azure/azure-sdk-for-go/sdk/azidentity                            v1.15.0                                                    MIT
 github.com/Azure/azure-sdk-for-go/sdk/internal                              v1.13.0                                                    MIT
 github.com/Azure/go-ntlmssp                                                 v0.1.2-0.20260824092057-1c8077778c2c                       MIT
 github.com/AzureAD/microsoft-authentication-library-for-go/apps             v1.10.1                                                    MIT
 github.com/BurntSushi/toml                                                  v1.6.0                                                     MIT
 github.com/CycloneDX/cyclonedx-go                                           v0.12.0                                                    Apache-2.0
-github.com/DataDog/zstd                                                     v1.5.7                                                     BSD-3-Clause
 github.com/GoogleCloudPlatform/opentelemetry-operations-go/detectors/gcp    v1.35.0                                                    Apache-2.0
 github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/metric  v0.57.0                                                    Apache-2.0
 github.com/GoogleCloudPlatform/opentelemetry-operations-go/internal/resourcemapping v0.57.0                                                    Apache-2.0
@@ -172,12 +183,12 @@ github.com/anchore/go-rpmdb/pkg                                             v0.2
 github.com/anchore/go-struct-converter                                      v0.2.0-rc2                                                 Apache-2.0
 github.com/anchore/go-sync                                                  v0.1.2                                                     Apache-2.0
 github.com/anchore/go-version                                               v1.2.2-0.20210903204242-51efa5b487c4                       MPL-2.0
-github.com/anchore/grype                                                    v0.121.2                                                   Apache-2.0
+github.com/anchore/grype                                                    v0.122.1                                                   Apache-2.0
 github.com/anchore/packageurl-go                                            v0.2.0                                                     MIT
-github.com/anchore/stereoscope                                              v0.4.1                                                     Apache-2.0
-github.com/anchore/syft                                                     v1.57.0                                                    Apache-2.0
-github.com/andybalholm/brotli                                               v1.2.7                                                     MIT
-github.com/apparentlymart/go-textseg/v15/textseg                            v15.0.0                                                    MIT
+github.com/anchore/stereoscope                                              v0.4.2                                                     Apache-2.0
+github.com/anchore/syft                                                     v1.57.2                                                    Apache-2.0
+github.com/andybalholm/brotli                                               v1.3.0                                                     MIT
+github.com/apparentlymart/go-textseg/v15/textseg                            v15.0.0                                                    MIT and Unicode-DFS-2016
 github.com/aquasecurity/go-pep440-version                                   v0.0.1                                                     Apache-2.0
 github.com/aquasecurity/go-version/pkg                                      v0.0.1                                                     Apache-2.0
 github.com/aws/aws-sdk-go-v2                                                v1.47.3                                                    Apache-2.0
@@ -207,7 +218,7 @@ github.com/bgentry/go-netrc/netrc                                           v0.0
 github.com/bitnami/go-version/pkg/version                                   v0.0.0-20250505154626-452e8c5ee607                         Apache-2.0
 github.com/blakesmith/ar                                                    v0.0.0-20190502131153-809d4375e1fb                         MIT
 github.com/bmatcuk/doublestar/v2                                            v2.0.4                                                     MIT
-github.com/bmatcuk/doublestar/v4                                            v4.10.3                                                    MIT
+github.com/bmatcuk/doublestar/v4                                            v4.10.4                                                    MIT
 github.com/bodgit/plumbing                                                  v1.3.0                                                     BSD-3-Clause
 github.com/bodgit/sevenzip                                                  v1.6.1                                                     BSD-3-Clause
 github.com/bodgit/windows                                                   v1.0.1                                                     BSD-3-Clause
@@ -221,7 +232,7 @@ github.com/charmbracelet/x/cellbuf                                          v0.0
 github.com/charmbracelet/x/term                                             v0.2.2                                                     MIT
 github.com/clipperhouse/displaywidth                                        v0.11.0                                                    MIT
 github.com/clipperhouse/uax29/v2/graphemes                                  v2.7.0                                                     MIT
-github.com/cloudflare/circl                                                 v1.6.3                                                     BSD-3-Clause
+github.com/cloudflare/circl                                                 v1.6.5                                                     BSD-3-Clause
 github.com/cncf/xds/go                                                      v0.0.0-20260202195803-dba9d589def2                         Apache-2.0
 github.com/containerd/containerd/api                                        v1.12.0                                                    Apache-2.0
 github.com/containerd/containerd/v2                                         v2.4.2                                                     Apache-2.0
@@ -235,14 +246,16 @@ github.com/containerd/platforms                                             v1.0
 github.com/containerd/plugin                                                v1.1.0                                                     Apache-2.0
 github.com/containerd/ttrpc                                                 v1.2.9                                                     Apache-2.0
 github.com/containerd/typeurl/v2                                            v2.3.0                                                     Apache-2.0
-github.com/coreos/go-oidc/v3                                                v3.21.0                                                    Apache-2.0
-github.com/cyphar/filepath-securejoin                                       v0.7.0                                                     MPL-2.0
+github.com/coreos/go-oidc/v3/oidc                                           v3.21.0                                                    Apache-2.0
+github.com/cyphar/filepath-securejoin                                       v0.7.0                                                     MPL-2.0 and BSD-3-Clause
 github.com/deitch/magic/pkg/magic                                           v1.0.0                                                     Apache-2.0
+github.com/deitch/magic/pkg/magic/internal                                  v1.0.0                                                     Apache-2.0
+github.com/deitch/magic/pkg/magic/parser                                    v1.0.0                                                     Apache-2.0
 github.com/dennwc/varint                                                    v1.0.0                                                     MIT
 github.com/diskfs/go-diskfs                                                 v1.9.4                                                     MIT
 github.com/distribution/reference                                           v0.6.0                                                     Apache-2.0
-github.com/docker/cli/cli                                                   v29.9.2+incompatible                                       Apache-2.0
-github.com/docker/cli/cli/connhelper/internal/syntax                        v29.9.2+incompatible                                       BSD-3-Clause
+github.com/docker/cli/cli                                                   v29.9.3+incompatible                                       Apache-2.0
+github.com/docker/cli/cli/connhelper/internal/syntax                        v29.9.3+incompatible                                       BSD-3-Clause
 github.com/docker/docker-credential-helpers                                 v0.9.10                                                    MIT
 github.com/docker/go-connections                                            v0.8.2                                                     Apache-2.0
 github.com/docker/go-units                                                  v0.5.0                                                     Apache-2.0
@@ -283,7 +296,7 @@ github.com/go-webauthn/x/crypto/secp256k1                                   v0.3
 github.com/go-webauthn/x/encoding/asn1                                      v0.3.1                                                     BSD-3-Clause
 github.com/go-webauthn/x/revoke                                             v0.3.1                                                     BSD-2-Clause
 github.com/goccy/go-yaml                                                    v1.19.2                                                    MIT
-github.com/gocsaf/csaf/v3                                                   v3.5.1                                                     Apache-2.0
+github.com/gocsaf/csaf/v3                                                   v3.7.1                                                     Apache-2.0
 github.com/gohugoio/hashstructure                                           v0.6.0                                                     MIT
 github.com/golang-jwt/jwt/v5                                                v5.3.1                                                     MIT
 github.com/golang/groupcache/lru                                            v0.0.0-20241129210726-2c02b8208cf8                         Apache-2.0
@@ -299,7 +312,7 @@ github.com/googleapis/enterprise-certificate-proxy/client                   v0.3
 github.com/googleapis/gax-go/v2                                             v2.26.2                                                    BSD-3-Clause
 github.com/gookit/color                                                     v1.6.3                                                     MIT
 github.com/gosnmp/gosnmp                                                    v1.47.0                                                    BSD-2-Clause
-github.com/gpustack/gguf-parser-go                                          v0.27.0                                                    MIT
+github.com/gpustack/gguf-parser-go                                          v0.28.1                                                    MIT
 github.com/grafana/regexp                                                   v0.0.0-20250905093917-f7b3be9d1853                         BSD-3-Clause
 github.com/hako/durafmt                                                     v0.0.0-20210608085754-5c1018a4e16b                         MIT
 github.com/hashicorp/aws-sdk-go-base/v2/endpoints                           v2.0.0-beta.74                                             MPL-2.0
@@ -325,11 +338,11 @@ github.com/json-iterator/go                                                 v1.1
 github.com/kardianos/service                                                v1.3.0                                                     Zlib
 github.com/kastenhq/goversion/version                                       v0.0.0-20230811215019-93b2f8823953                         BSD-3-Clause
 github.com/kevinburke/ssh_config                                            v1.2.0                                                     MIT
-github.com/klauspost/compress                                               v1.20.3                                                    Apache-2.0
-github.com/klauspost/compress/internal/snapref                              v1.20.3                                                    BSD-3-Clause
-github.com/klauspost/compress/s2                                            v1.20.3                                                    BSD-3-Clause
-github.com/klauspost/compress/snappy                                        v1.20.3                                                    BSD-3-Clause
-github.com/klauspost/compress/zstd/internal/xxhash                          v1.20.3                                                    MIT
+github.com/klauspost/compress                                               v1.20.4                                                    BSD-3-Clause
+github.com/klauspost/compress/internal/snapref                              v1.20.4                                                    BSD-3-Clause
+github.com/klauspost/compress/s2                                            v1.20.4                                                    BSD-3-Clause
+github.com/klauspost/compress/snappy                                        v1.20.4                                                    BSD-3-Clause
+github.com/klauspost/compress/zstd/internal/xxhash                          v1.20.4                                                    MIT
 github.com/klauspost/pgzip                                                  v1.2.7                                                     MIT
 github.com/knqyf263/go-apk-version                                          v0.0.0-20200609155635-041fdbb8563f                         Apache-2.0
 github.com/knqyf263/go-deb-version                                          v0.0.0-20241115132648-6f4aee6ccd23                         MIT
@@ -339,7 +352,7 @@ github.com/masahiro331/go-mvn-version                                       v0.0
 github.com/mattn/go-colorable                                               v0.1.16                                                    MIT
 github.com/mattn/go-isatty                                                  v0.0.24                                                    MIT
 github.com/mattn/go-runewidth                                               v0.0.31                                                    MIT
-github.com/mfridman/interpolate                                             v0.0.2                                                     MIT
+github.com/mfridman/interpolate                                             v0.2.0                                                     MIT
 github.com/mgutz/ansi                                                       v0.0.0-20200706080929-d51e80ef957d                         MIT
 github.com/mholt/archives                                                   v0.1.5                                                     MIT
 github.com/mikelolasagasti/xz                                               v1.0.1                                                     0BSD
@@ -352,7 +365,7 @@ github.com/moby/docker-image-spec/specs-go/v1                               v1.3
 github.com/moby/locker                                                      v1.0.1                                                     Apache-2.0
 github.com/moby/moby/api/types                                              v1.56.1                                                    Apache-2.0
 github.com/moby/moby/client                                                 v0.6.2                                                     Apache-2.0
-github.com/moby/sys/mountinfo                                               v0.7.2                                                     Apache-2.0
+github.com/moby/sys/mountinfo                                               v0.7.3                                                     Apache-2.0
 github.com/moby/sys/signal                                                  v0.7.1                                                     Apache-2.0
 github.com/moby/sys/user                                                    v0.4.1                                                     Apache-2.0
 github.com/moby/sys/userns                                                  v0.2.1                                                     Apache-2.0
@@ -373,7 +386,7 @@ github.com/opencontainers/image-spec                                        v1.1
 github.com/opencontainers/runtime-spec/specs-go                             v1.3.0                                                     Apache-2.0
 github.com/openvex/go-vex/pkg                                               v0.2.9                                                     Apache-2.0
 github.com/package-url/packageurl-go                                        v0.1.7                                                     MIT
-github.com/pandatix/go-abnf                                                 v0.5.3                                                     MIT
+github.com/pandatix/go-abnf                                                 v0.5.5                                                     MIT
 github.com/pandatix/go-cvss                                                 v0.6.4                                                     MIT
 github.com/pborman/indent                                                   v1.2.1                                                     Apache-2.0
 github.com/pelletier/go-toml                                                v1.9.5                                                     Apache-2.0
@@ -388,14 +401,14 @@ github.com/pkg/profile                                                      v1.7
 github.com/pkg/xattr                                                        v0.4.12                                                    BSD-2-Clause
 github.com/pquerna/cachecontrol                                             v0.0.0-20180517163645-1555304b9b35                         Apache-2.0
 github.com/pquerna/otp                                                      v1.5.0                                                     Apache-2.0
-github.com/pressly/goose/v3                                                 v3.29.0                                                    MIT
+github.com/pressly/goose/v3                                                 v3.30.1                                                    MIT
 github.com/prometheus-community/pro-bing                                    v0.9.1                                                     MIT
 github.com/prometheus/client_golang/exp                                     v0.0.0-20261019101427-217707f26b14                         Apache-2.0
 github.com/prometheus/client_golang/prometheus                              v1.25.0                                                    Apache-2.0
 github.com/prometheus/client_model/go                                       v0.6.3                                                     Apache-2.0
-github.com/prometheus/common                                                v0.73.1                                                    Apache-2.0
+github.com/prometheus/common                                                v0.74.0                                                    Apache-2.0
 github.com/prometheus/otlptranslator                                        v1.0.0                                                     Apache-2.0
-github.com/prometheus/procfs                                                v0.22.0                                                    Apache-2.0
+github.com/prometheus/procfs                                                v0.23.0                                                    Apache-2.0
 github.com/prometheus/prometheus                                            v0.316.0                                                   Apache-2.0
 github.com/prometheus/sigv4                                                 v0.5.0                                                     Apache-2.0
 github.com/remyoudompheng/bigfft                                            v0.0.0-20230129092748-24d4a6f8daec                         BSD-3-Clause
@@ -409,7 +422,7 @@ github.com/scylladb/go-set                                                  v1.0
 github.com/sergi/go-diff/diffmatchpatch                                     v1.4.0                                                     MIT
 github.com/sethvargo/go-retry                                               v0.5.0                                                     Apache-2.0
 github.com/shirou/gopsutil/v4                                               v4.26.10                                                   BSD-3-Clause
-github.com/shopspring/decimal                                               v1.5.0                                                     MIT
+github.com/shopspring/decimal                                               v1.6.0                                                     MIT
 github.com/sirupsen/logrus                                                  v1.10.2                                                    MIT
 github.com/skeema/knownhosts                                                v1.3.1                                                     Apache-2.0
 github.com/smallnest/ringbuffer                                             v0.0.0-20241116012123-461381446e3d                         MIT
@@ -460,27 +473,27 @@ go.opentelemetry.io/otel/trace                                              v1.4
 go.uber.org/atomic                                                          v1.12.0                                                    MIT
 go.uber.org/goleak                                                          v1.3.0                                                     MIT
 go.uber.org/multierr                                                        v1.11.0                                                    MIT
-go.yaml.in/yaml/v2                                                          v2.4.4                                                     Apache-2.0
-go.yaml.in/yaml/v3                                                          v3.0.5                                                     MIT
+go.yaml.in/yaml/v2                                                          v2.4.5                                                     Apache-2.0
+go.yaml.in/yaml/v3                                                          v3.0.6                                                     MIT
 go4.org/readerutil                                                          v0.0.0-20230225012048-214862532bf5                         Apache-2.0
-golang.org/x/crypto                                                         v0.58.0                                                    BSD-3-Clause
-golang.org/x/exp                                                            v0.0.0-20261014143641-f0251eb4aa3e                         BSD-3-Clause
+golang.org/x/crypto                                                         v0.59.0                                                    BSD-3-Clause
+golang.org/x/exp                                                            v0.0.0-20261109185158-a52e3aef5920                         BSD-3-Clause
 golang.org/x/mod                                                            v0.42.0                                                    BSD-3-Clause
-golang.org/x/net                                                            v0.62.0                                                    BSD-3-Clause
+golang.org/x/net                                                            v0.63.0                                                    BSD-3-Clause
 golang.org/x/oauth2                                                         v0.38.0                                                    BSD-3-Clause
-golang.org/x/sync                                                           v0.24.0                                                    BSD-3-Clause
+golang.org/x/sync                                                           v0.25.0                                                    BSD-3-Clause
 golang.org/x/sys                                                            v0.50.0                                                    BSD-3-Clause
 golang.org/x/sys/windows                                                    v0.50.0                                                    BSD-3-Clause
-golang.org/x/term                                                           v0.47.0                                                    BSD-3-Clause
-golang.org/x/text                                                           v0.43.0                                                    BSD-3-Clause
+golang.org/x/term                                                           v0.48.0                                                    BSD-3-Clause
+golang.org/x/text                                                           v0.44.0                                                    BSD-3-Clause
 golang.org/x/time/rate                                                      v0.16.0                                                    BSD-3-Clause
-golang.org/x/tools                                                          v0.52.0                                                    BSD-3-Clause
+golang.org/x/tools                                                          v0.52.1-0.20261106145633-d407941a339a                      BSD-3-Clause
 golang.org/x/xerrors                                                        v0.0.0-20240903120638-7835f813f4da                         BSD-3-Clause
 google.golang.org/api                                                       v0.305.0                                                   BSD-3-Clause
 google.golang.org/api/internal/third_party/uritemplates                     v0.305.0                                                   BSD-3-Clause
-google.golang.org/genproto/googleapis/api                                   v0.0.0-20261019180522-ce908d29299b                         Apache-2.0
-google.golang.org/genproto/googleapis/rpc                                   v0.0.0-20261012220534-4341edf3f941                         Apache-2.0
-google.golang.org/genproto/googleapis/rpc/status                            v0.0.0-20261012220534-4341edf3f941                         Apache-2.0
+google.golang.org/genproto/googleapis/api                                   v0.0.0-20261110000943-09e21b237f2c                         Apache-2.0
+google.golang.org/genproto/googleapis/rpc                                   v0.0.0-20261110000943-09e21b237f2c                         Apache-2.0
+google.golang.org/genproto/googleapis/rpc/status                            v0.0.0-20261110000943-09e21b237f2c                         Apache-2.0
 google.golang.org/genproto/googleapis/type                                  v0.0.0-20260715232425-e75dac1f907d                         Apache-2.0
 google.golang.org/grpc                                                      v1.85.0                                                    Apache-2.0
 google.golang.org/protobuf                                                  v1.36.12                                                   BSD-3-Clause
@@ -488,20 +501,18 @@ gopkg.in/warnings.v0                                                        v0.1
 gopkg.in/yaml.v3                                                            v3.0.1                                                     MIT
 gorm.io/gorm                                                                v1.31.2                                                    MIT
 howett.net/plist                                                            v1.0.1                                                     BSD-2-Clause
-k8s.io/apimachinery/pkg                                                     v0.37.1                                                    Apache-2.0
-k8s.io/apimachinery/third_party/forked/golang/reflect                       v0.37.1                                                    BSD-3-Clause
+k8s.io/apimachinery/pkg/util                                                v0.37.1                                                    Apache-2.0
 k8s.io/client-go                                                            v0.37.1                                                    Apache-2.0
 k8s.io/klog/v2                                                              v2.140.0                                                   Apache-2.0
-k8s.io/utils                                                                v0.0.0-20260626114624-be93311217bd                         Apache-2.0
-k8s.io/utils/internal/third_party/forked/golang/net                         v0.0.0-20260626114624-be93311217bd                         BSD-3-Clause
+k8s.io/utils/clock                                                          v0.0.0-20260626114624-be93311217bd                         Apache-2.0
 layeh.com/radius                                                            v0.0.0-20231213012653-1006025d24f8                         MPL-2.0
-modernc.org/libc                                                            v1.79.0                                                    MIT
+modernc.org/libc                                                            v1.80.2                                                    BSD-3-Clause
 modernc.org/mathutil                                                        v1.7.1                                                     BSD-3-Clause
 modernc.org/memory                                                          v1.12.1                                                    BSD-3-Clause
-modernc.org/sqlite/lib                                                      v1.61.0                                                    BSD-3-Clause
+modernc.org/sqlite/lib                                                      v1.62.0                                                    BSD-3-Clause
 
 To regenerate:
-  go install github.com/google/go-licenses@latest
+  go install github.com/google/go-licenses/v2@v2.0.1
   go-licenses report ./cmd/...
   GOOS=windows go-licenses report ./cmd/sentrel-agent
   (cd web && npx license-checker --production --summary)
