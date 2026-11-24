@@ -4,7 +4,11 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
-## [0.9.18]
+## [0.9.19]
+
+### Fixed
+
+- Make the status-page tenant-isolation regression test inspect host and chart data directly, avoiding false failures when the response timestamp contains the sample value.
 
 ### Changed
 

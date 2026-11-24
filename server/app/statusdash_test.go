@@ -115,8 +115,14 @@ func TestStatusPageMetricsStayInTenant(t *testing.T) {
 		tid, "forged", "Forged", `[{"type":"host","id":`+itoa(hostID)+`,"label":"x","metrics":["cpu"]}]`); err != nil {
 		t.Fatal(err)
 	}
-	_, m, raw := e.client().do("GET", "/public/status/forged", nil)
-	if len(m["items"].([]any)) != 0 || strings.Contains(string(raw), "77") {
+	code, m, raw := e.client().do("GET", "/public/status/forged", nil)
+	if code != 200 {
+		t.Fatalf("forged page: %d %s", code, raw)
+	}
+	// Inspect the metric-bearing fields, not the raw JSON: timestamps may
+	// legitimately contain the digits of the foreign host's sample value.
+	ov := m["overview"].(map[string]any)
+	if len(m["items"].([]any)) != 0 || ov["hosts_total"].(float64) != 0 || len(ov["charts"].([]any)) != 0 {
 		t.Fatalf("foreign host leaked: %s", raw)
 	}
 }
