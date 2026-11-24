@@ -4,6 +4,14 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
+## [0.9.18]
+
+### Changed
+
+- Update Go dependencies: Grype 0.122.1, Syft 1.57.2, goose 3.30.1, Prometheus common 0.74.0, x/crypto 0.59.0 and x/net 0.63.0, including their transitive updates.
+- Update frontend dependencies: TanStack Query 5.108.2, lucide-react 1.77.0, React Router 7.18.6, Vite React plugin 6.3.0, Vite 8.3.8 and Vitest 5.1.1.
+- Refresh third-party dependency notices and document the reviewed licence choices used by the linked Go packages.
+
 ## [0.9.17] - 2026-11-12
 
 ### Changed
